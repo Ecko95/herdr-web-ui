@@ -53,7 +53,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
 
       <div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 28px 40px">
         <div style="flex: 0 1 auto; min-width: 260px; max-width: 100%; display: flex; justify-content: center; filter: {{glow}}">
-          <sc-if value="{{artReady}}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{artReady}}" hint-placeholder-val="{{ false }}">
             <div role="img" aria-label="{{poseAlt}}" style="font-family: 'Noto Sans Symbols 2', 'DejaVu Sans Mono', monospace; font-size: {{artFont}}; line-height: 1; letter-spacing: 0; font-variant-ligatures: none">
               <sc-for list="{{artLines}}" as="ln" hint-placeholder-count="60">
                 <div style="height: 1em; white-space: pre; animation: motoko-in 0s steps(1, end) {{ln.delay}} both"><sc-for list="{{ln.runs}}" as="r" hint-placeholder-count="20"><span style="color: {{r.color}}">{{r.text}}</span></sc-for></div>
@@ -63,7 +63,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
           <sc-if value="{{artLoading}}" hint-placeholder-val="{{ false }}">
             <div style="min-height: 620px; display: flex; align-items: center; color: #9b9183">loading portrait…</div>
           </sc-if>
-          <sc-if value="{{artFailed}}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{showImage}}" hint-placeholder-val="{{ true }}">
             <img src="{{logoSrc}}" alt="{{poseAlt}}" style="display: block; width: auto; height: auto; max-width: min(100%, 760px); max-height: 620px; animation: motoko-scan 1.6s steps(28, end) 0.35s both">
           </sc-if>
         </div>
@@ -315,7 +315,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"logoStyle":{"editor":"enum","options":["color","dots"],"default":"color"},"$preview":{"width":1440,"height":1100}}'>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"logoStyle":{"editor":"enum","options":["color","dots","braille"],"default":"color"},"$preview":{"width":1440,"height":1100}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -332,7 +332,7 @@ class Component extends DCLogic {
   }
   componentDidMount() {
     var self = this;
-    // the boot portraits are coloured Braille text (2x4 dots per character), one JSON for all poses
+    // the optional Braille style (logoStyle: braille) draws the poses as coloured Braille text, one JSON for all
     fetch('../logo/motoko-braille.json').then(function (r) { return r.json(); })
       .then(function (d) { self.setState({ art: d }); })
       .catch(function () { self.setState({ artFailed: true }); });
@@ -385,8 +385,9 @@ class Component extends DCLogic {
       { color: '../logo/poses/motoko-visor-color.webp', dots: '../logo/poses/motoko-visor-mono.webp', alt: 'Motoko in dot art, wearing a visor and tapping her temple' }
     ];
     var art = null;
-    if (s.art) {
-      var ap = s.art.poses[s.pose], fr = ap.frames[s.frame] || ap.frames.open, mono = (this.props.logoStyle ?? 'color') === 'dots';
+    var style = this.props.logoStyle ?? 'color', braille = style === 'braille';
+    if (braille && s.art) {
+      var ap = s.art.poses[s.pose], fr = ap.frames[s.frame] || ap.frames.open, mono = false;
       var pinkAt = ap.palette.length - 1;
       art = {
         // fit 620 px high and 760 px wide on a desktop; shrink with the viewport on a phone
@@ -438,9 +439,9 @@ class Component extends DCLogic {
       isVoice: voiceOn, isDictating: s.voice === 'dictating', showComposer: !voiceOn,
       isEmpty: !hasMsgs,
       logoSize: voiceOn ? '208px' : hasMsgs && s.mode === 'chat' ? '96px' : '184px',
-      logoSrc: (this.props.logoStyle ?? 'color') === 'dots' ? POSES[s.pose].dots : POSES[s.pose].color,
+      logoSrc: style === 'dots' ? POSES[s.pose].dots : POSES[s.pose].color,
       poseAlt: POSES[s.pose].alt,
-      artReady: !!art, artLoading: !art && !s.artFailed, artFailed: !art && s.artFailed,
+      artReady: !!art, artLoading: braille && !art && !s.artFailed, showImage: !art && (!braille || s.artFailed),
       artLines: art ? art.lines : [], artFont: art ? art.font : '10px',
       boot: s.boot,
       glow: voiceOn ? 'drop-shadow(0 0 22px rgba(240, 168, 48, 0.35))' : 'none',
