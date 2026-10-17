@@ -29,16 +29,16 @@ dot-matrix image) that blinks every few seconds, with an occasional double blink
 
 | File | Use |
 | --- | --- |
-| `logo/motoko-mono-full.webp` | Default boot-screen portrait on Ask Motoko: warm white dots, pink irises, transparent background, 896 px |
-| `logo/motoko-color-full.webp` | Colour variant (the artboard's `logoStyle` tweak), transparent, 896 px |
+| `logo/motoko-mono-full.webp` | Default boot-screen portrait on Ask Motoko: warm white dots, pink irises, transparent background, 200×200 dots, 1000 px |
+| `logo/motoko-color-full.webp` | Colour variant (the artboard's `logoStyle` tweak), transparent, 200×200 dots, 1000 px |
 | `logo/motoko-face-color.webp` | Face close-up for small places: chat avatar, header status |
 | `logo/motoko-source.webp` | The source portrait |
 | `logo/blink.py`, `logo/dots.py` | Regenerate them (Python 3 with Pillow and NumPy): `blink.py` paints the half-closed and closed eye frames, `dots.py` turns each frame into the dot grid and writes the animation |
 
 ```sh
 python3 blink.py motoko-source.webp .                 # open.png, half.png, closed.png
-ALPHA=1 python3 dots.py . 112 8 mono motoko-mono-full     # 112×112 dots, 8 px each, transparent
-ALPHA=1 python3 dots.py . 112 8 color motoko-color-full
+ALPHA=1 python3 dots.py . 200 5 mono motoko-mono-full     # 200×200 dots, 5 px each, transparent
+ALPHA=1 python3 dots.py . 200 5 color motoko-color-full
 python3 dots.py . 28 4 color motoko-face-color 300,330,860,890   # face crop
 ```
 
