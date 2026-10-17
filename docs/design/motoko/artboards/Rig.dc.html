@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rig explorer</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#12100e}
+a{color:#f0a830}a:hover{color:#f6bb55}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #12100e; color: #d8d0c3; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.45; display: flex; flex-direction: column">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 20px; min-height: 52px; box-sizing: border-box; background: #181613; border-bottom: 1px solid #2d2924">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; border: 1px solid #3e3830">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>Motoko</a>
+    <span style="font-family: 'JetBrains Mono', monospace; color: #9b9183; font-size: 13px">Rig explorer</span>
+    <label style="flex: 1 1 320px; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border-radius: 6px; background: #1c1916; border: 1px solid #3e3830; font-family: 'JetBrains Mono', monospace; font-size: 13px">
+      <span style="color: {{accent}}">›</span>
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">rig tui command</span>
+      <input type="text" value="{{command}}" readonly="{{ true }}" style="flex: 1 1 auto; min-width: 0; background: transparent; border: 0; color: #f2ebdf; font: inherit; outline: none">
+      <span style="color: #9b9183; font-size: 11px">? commands</span>
+    </label>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: stretch; flex: 1 1 auto">
+
+    <nav aria-label="Explorer" style="flex: 1 1 230px; max-width: 270px; box-sizing: border-box; padding: 16px 10px; border-right: 1px solid #2d2924; display: flex; flex-direction: column; gap: 18px; font-family: 'JetBrains Mono', monospace; font-size: 13px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9b9183; padding: 0 8px 6px">Hosts</div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #93c36b"></span>vps-01</div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #f9e2af"></span>vps-02</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9b9183; padding: 0 8px 6px">Rigs</div>
+        <sc-for list="{{rigs}}" as="r" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column">
+            <button type="button" onClick="{{r.pick}}" aria-pressed="{{r.selected}}" style="display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 8px; border: 0; border-radius: 6px; background: {{r.bg}}; color: #f2ebdf; font: inherit; text-align: left; cursor: pointer">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="{{r.chevron}}"></polyline></svg>{{r.name}}<span style="margin-left: auto; color: #9b9183; font-size: 11px">{{r.host}}</span>
+            </button>
+            <sc-if value="{{r.selected}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; padding-left: 14px">
+                <sc-for list="{{r.pods}}" as="p" hint-placeholder-count="2">
+                  <div style="display: flex; flex-direction: column">
+                    <div style="padding: 6px 8px 2px; color: #9b9183; font-size: 12px">pod {{p.name}}</div>
+                    <sc-for list="{{p.seats}}" as="s" hint-placeholder-count="2">
+                      <button type="button" onClick="{{s.pick}}" aria-pressed="{{s.selected}}" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: {{s.rowBg}}; color: {{s.rowText}}; font: inherit; font-size: 12px; text-align: left; cursor: pointer">
+                        <span style="width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; flex: none; background: {{s.dotBg}}; border: {{s.dotBorder}}"></span>{{s.member}}
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </nav>
+
+    <main style="flex: 999 1 480px; min-width: 0; display: flex; flex-wrap: wrap; align-items: stretch">
+
+      <section style="flex: 3 1 440px; min-width: 0; box-sizing: border-box; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; border-right: 1px solid #2d2924">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap">
+            <h1 style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 500; color: #f2ebdf">{{rig.name}}</h1>
+            <span style="font-size: 12px; color: #9b9183">{{rig.spec}} · {{rig.host}} · restore-check: <span style="color: #93c36b">would resume</span></span>
+          </div>
+          <p style="margin: 0; color: #9b9183">{{rig.purpose}}</p>
+        </div>
+        <div role="tablist" aria-label="Rig view" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #2d2924">
+          <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+            <button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="min-height: 38px; padding: 0 12px; border: 0; border-bottom: 2px solid {{t.line}}; background: transparent; color: {{t.color}}; font: inherit; font-family: 'JetBrains Mono', monospace; font-size: 13px; cursor: pointer">{{t.label}}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{isTable}}" hint-placeholder-val="{{ true }}">
+          <div style="overflow-x: auto; border: 1px solid #2d2924; border-radius: 8px; background: #181613">
+            <table style="width: 100%; min-width: 600px; border-collapse: collapse; font-size: 12px">
+              <thead>
+                <tr style="text-align: left; color: #9b9183">
+                  <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #2d2924">Seat</th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #2d2924">Runtime</th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #2d2924">Activity</th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #2d2924">Queue item</th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #2d2924">State</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{rig.allSeats}}" as="s" hint-placeholder-count="4">
+                  <tr style="background: {{s.rowBg}}">
+                    <td style="padding: 0; border-bottom: 1px solid #2d2924"><button type="button" onClick="{{s.pick}}" style="width: 100%; min-height: 40px; padding: 0 12px; border: 0; background: transparent; color: #f2ebdf; font: inherit; font-family: 'JetBrains Mono', monospace; text-align: left; cursor: pointer">{{s.address}}</button></td>
+                    <td style="padding: 0 12px; border-bottom: 1px solid #2d2924; color: #9b9183">{{s.runtime}}</td>
+                    <td style="padding: 0 12px; border-bottom: 1px solid #2d2924; color: {{s.actColor}}"><span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; background: {{s.dotBg}}; border: {{s.dotBorder}}"></span>{{s.activity}}</span></td>
+                    <td style="padding: 0 12px; border-bottom: 1px solid #2d2924; font-family: 'JetBrains Mono', monospace">{{s.qitem}}</td>
+                    <td style="padding: 0 12px; border-bottom: 1px solid #2d2924; color: {{s.qColor}}">{{s.qstate}}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isTopology}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <p style="margin: 0; font-size: 12px; color: #9b9183">delegates_to edges: launch order, and who is alerted when work stalls.</p>
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid #2d2924; border-radius: 8px; background: #181613; font-family: 'JetBrains Mono', monospace; font-size: 12px">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid #2d2924"><span style="padding: 4px 10px; border-radius: 6px; background: rgba(240, 168, 48, 0.13); color: {{accent}}">hermes (Motoko)</span><span style="color: #9b9183">→</span><span style="padding: 4px 10px; border-radius: 6px; background: #211e1a; border: 1px solid #3e3830">operator@kernel</span><span style="color: #9b9183">hands rig work over by queue item</span></div>
+              <sc-for list="{{rig.edges}}" as="e" hint-placeholder-count="4">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+                  <span style="padding: 4px 10px; border-radius: 6px; background: #211e1a; border: 1px solid #3e3830">{{e.from}}</span>
+                  <span style="color: #9b9183">delegates_to →</span>
+                  <span style="padding: 4px 10px; border-radius: 6px; background: #211e1a; border: 1px solid #3e3830">{{e.to}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isHealth}}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px">
+            <sc-for list="{{rig.health}}" as="hh" hint-placeholder-count="4">
+              <div style="padding: 14px; border: 1px solid #2d2924; border-radius: 8px; background: #181613; display: flex; flex-direction: column; gap: 4px">
+                <span style="font-size: 12px; color: #9b9183">{{hh.label}}</span>
+                <span style="color: {{hh.color}}">{{hh.value}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </section>
+
+      <aside style="flex: 2 1 380px; min-width: 0; box-sizing: border-box; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+          <span style="width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; background: {{seat.dotBg}}; border: {{seat.dotBorder}}"></span>
+          <h2 style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; color: #f2ebdf">{{seat.address}}</h2>
+          <span style="font-size: 12px; color: {{seat.actColor}}">{{seat.activity}}</span>
+          <span style="margin-left: auto; font-size: 12px; color: #9b9183">{{seat.runtime}} · herdr pane</span>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 320px; padding: 12px 14px; border-radius: 8px; border: 1px solid #2d2924; background: #0d0b09; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; overflow: auto">
+          <sc-for list="{{seat.lines}}" as="ln" hint-placeholder-count="6">
+            <div style="color: {{ln.color}}; white-space: pre-wrap">{{ln.text}}</div>
+          </sc-for>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #9b9183">Message this seat (rig send, with a from-line for replies)
+          <textarea rows="2" placeholder="Type a message for {{seat.address}}" style="resize: vertical; padding: 10px 12px; border-radius: 8px; border: 1px solid #3e3830; background: #1c1916; color: #f2ebdf; font: inherit; font-size: 13px"></textarea>
+        </label>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" style="flex: 1 1 120px; min-height: 40px; border-radius: 8px; border: 0; background: {{accent}}; color: #1b1407; font: inherit; font-weight: 600; cursor: pointer">Send</button>
+          <button type="button" style="flex: 1 1 120px; min-height: 40px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Capture screen</button>
+          <button type="button" style="flex: 1 1 120px; min-height: 40px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Open tiles in herdr</button>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #9b9183">Watching never moves herdr's focus. Typing into the pane waits until you press Send. rig send will not type over a seat waiting at a permission prompt.</p>
+      </aside>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { rig: 'factory', seat: 'dev-builder@factory', tab: 'table' };
+  }
+  renderVals() {
+    var self = this;
+    var accent = this.props.accent ?? '#f0a830';
+    var C = { working: '#6cb8d6', blocked: '#ff7b70', done: '#93c36b', idle: '#9b9183', warn: '#f9e2af', text: '#d8d0c3', dim: '#9b9183' };
+    var ACT = {
+      'working': { dotBg: C.working, dotBorder: '0', actColor: C.working },
+      'idle': { dotBg: C.idle, dotBorder: '0', actColor: C.idle },
+      'needs-input': { dotBg: C.blocked, dotBorder: '0', actColor: C.blocked },
+      'unknown': { dotBg: 'transparent', dotBorder: '1.5px dashed #9b9183', actColor: C.dim }
+    };
+    var Q = { 'pending': '#d8d0c3', 'in-progress': C.working, 'blocked': C.blocked, 'done': C.done, '': C.dim };
+    function L(text, color) { return { text: text, color: color || C.text }; }
+    function S(member, runtime, activity, qitem, qstate, lines) { return { member: member, runtime: runtime, activity: activity, qitem: qitem || '—', qstate: qstate || '', lines: lines }; }
+    var RIGS = [
+      { name: 'kernel', spec: 'built-in', host: 'vps-01', purpose: 'Advisor and operator. Hermes hands rig work to the operator.',
+        pods: [{ name: 'kernel', seats: [
+          S('advisor', 'claude-code', 'idle', '', '', [L('advisor@kernel ready.', C.dim)]),
+          S('operator', 'claude-code', 'working', 'ops-disk-0142', 'blocked', [L('from hermes: drafted ops-disk-0142, waiting on the human decision.', C.working), L('$ rig queue show ops-disk-0142'), L('state blocked · owner infra-systems@ops', C.dim), L('Waiting. I will not dispatch until it is resolved.', C.dim)])
+        ] }],
+        edges: [{ from: 'operator@kernel', to: 'orch-lead@factory' }, { from: 'operator@kernel', to: 'infra-systems@ops' }],
+        health: [{ label: 'Seats', value: '2 of 2 running', color: C.done }, { label: 'Last snapshot', value: '13:30', color: C.text }, { label: 'Held messages', value: 'none', color: C.text }, { label: 'rig health', value: 'no findings', color: C.done }] },
+      { name: 'factory', spec: 'factory spec', host: 'vps-02', purpose: '[YOUR PROJECT]: build and review.',
+        pods: [
+          { name: 'orch', seats: [
+            S('lead', 'claude-code', 'working', 'plan-0207', 'in-progress', [L('Coordinating wave 2. dev-designer is on the settings screen.', C.text), L('$ rig capture dev-builder@factory'), L('dev-builder is at a permission prompt. Flagged in attention.', C.blocked)]),
+            S('advisor', 'codex', 'idle', '', '', [L('orch-advisor@factory idle.', C.dim)])
+          ] },
+          { name: 'dev', seats: [
+            S('builder', 'claude-code', 'needs-input', 'build-0311', 'in-progress', [L('Editing src/settings/schema.ts', C.text), L('Running the migration script needs approval:', C.text), L('  node scripts/migrate.js --apply', C.warn), L('Allow?  1 Yes   2 Yes, always   3 No', C.blocked), L('Answer in herdr. Hermes will not answer prompts for you.', C.dim)]),
+            S('designer', 'codex', 'working', 'design-0198', 'in-progress', [L('Drafting the empty, loading and error states.', C.text), L('$ cat notes/settings-states.md'), L('Empty: "Nothing to configure yet."', C.dim)])
+          ] },
+          { name: 'qa', seats: [S('test', 'claude-code', 'working', 'check-0090', 'in-progress', [L('Running the end-to-end path on staging.', C.text), L('12 of 18 steps pass so far.', C.dim)])] },
+          { name: 'review', seats: [
+            S('a', 'claude-code', 'idle', 'review-0120', 'pending', [L('Waiting for build-0311 to hand off.', C.dim)]),
+            S('b', 'codex', 'unknown', 'review-0121', 'pending', [L('No recent screen sample. Shown as unknown, not idle.', C.dim)])
+          ] }
+        ],
+        edges: [{ from: 'orch-lead@factory', to: 'dev-builder@factory' }, { from: 'orch-lead@factory', to: 'dev-designer@factory' }, { from: 'dev-builder@factory', to: 'qa-test@factory' }, { from: 'qa-test@factory', to: 'review-a@factory' }, { from: 'qa-test@factory', to: 'review-b@factory' }],
+        health: [{ label: 'Seats', value: '7 running · 1 unknown', color: C.warn }, { label: 'Parked', value: 'dev-builder (prompt)', color: C.blocked }, { label: 'Held messages', value: '1 for dev-builder', color: C.warn }, { label: 'Last snapshot', value: '13:30', color: C.text }] },
+      { name: 'ops', spec: 'ops.yaml', host: 'vps-01', purpose: 'Keep the VPS hosts and services healthy.',
+        pods: [
+          { name: 'infra', seats: [
+            S('systems', 'claude-code', 'idle', 'ops-disk-0142', 'blocked', [L('Holding ops-disk-0142 until you decide.', C.dim), L('Plan: logrotate, compress *.log.1, check df.', C.text)]),
+            S('monitor', 'codex', 'working', 'ops-watch-0139', 'in-progress', [L('$ ssh vps-02 df -h /', C.text), L('/dev/vda1   80G   70G   10G  88% /', C.warn), L('Reported to rig health.', C.dim)])
+          ] },
+          { name: 'release', seats: [S('deploy', 'codex', 'idle', 'ops-release-007', 'blocked', [L('Staging deploy prepared. Held for your approval.', C.dim)])] }
+        ],
+        edges: [{ from: 'infra-systems@ops', to: 'infra-monitor@ops' }, { from: 'release-deploy@ops', to: 'infra-monitor@ops' }],
+        health: [{ label: 'Seats', value: '3 of 3 running', color: C.done }, { label: 'Blocked on you', value: '2 queue items', color: C.blocked }, { label: 'Held messages', value: 'none', color: C.text }, { label: 'Last snapshot', value: '13:30', color: C.text }] }
+    ];
+    var selRig = null, selSeat = null;
+    var rigs = RIGS.map(function (r) {
+      var selected = r.name === self.state.rig;
+      var allSeats = [];
+      var pods = r.pods.map(function (p) {
+        return { name: p.name, seats: p.seats.map(function (s) {
+          var address = (r.name === 'kernel' ? s.member : p.name + '-' + s.member) + '@' + r.name;
+          var on = address === self.state.seat;
+          var seat = Object.assign({}, s, ACT[s.activity], {
+            address: address, selected: on, qColor: Q[s.qstate],
+            rowBg: on ? 'rgba(240, 168, 48, 0.13)' : 'transparent', rowText: on ? '#f2ebdf' : C.text,
+            pick: function () { self.setState({ seat: address }); }
+          });
+          allSeats.push(seat);
+          if (on) selSeat = seat;
+          return seat;
+        }) };
+      });
+      var rig = Object.assign({}, r, { pods: pods, allSeats: allSeats, selected: selected, bg: selected ? '#211e1a' : 'transparent', chevron: selected ? '6 9 12 15 18 9' : '9 18 15 12 9 6',
+        pick: function () { self.setState({ rig: r.name, seat: allSeats[0].address }); } });
+      if (selected) selRig = rig;
+      return rig;
+    });
+    if (!selSeat) selSeat = selRig.allSeats[0];
+    var tabs = ['table', 'health', 'topology'].map(function (t) {
+      var on = t === self.state.tab;
+      return { label: t, selected: on, line: on ? accent : 'transparent', color: on ? '#f2ebdf' : C.dim, pick: function () { self.setState({ tab: t }); } };
+    });
+    return {
+      accent: accent,
+      rigs: rigs,
+      rig: selRig,
+      seat: selSeat,
+      tabs: tabs,
+      isTable: this.state.tab === 'table', isHealth: this.state.tab === 'health', isTopology: this.state.tab === 'topology',
+      command: 'agent ' + selSeat.address + '   tab ' + this.state.tab
+    };
+  }
+}
+</script>
+</body>
+</html>

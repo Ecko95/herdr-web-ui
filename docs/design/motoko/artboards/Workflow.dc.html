@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hermes operation ops-disk-0142</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#12100e}
+a{color:#f0a830}a:hover{color:#f6bb55}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #12100e; color: #d8d0c3; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 20px; min-height: 52px; box-sizing: border-box; background: #181613; border-bottom: 1px solid #2d2924">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; border: 1px solid #3e3830">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>Motoko</a>
+    <span style="font-family: 'JetBrains Mono', monospace; color: #9b9183; font-size: 13px">Attention / ops-disk-0142</span>
+    <div style="flex: 1 1 auto"></div>
+    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: {{phaseTint}}; color: {{phaseColor}}"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{phaseColor}}"></span>{{phaseLabel}}</span>
+  </header>
+
+  <div style="max-width: 1200px; margin: 0 auto; padding: 28px 24px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px">
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #f2ebdf">Free disk on vps-02: rotate and compress rig logs</h1>
+      <p style="margin: 0; color: #9b9183">Queue item drafted by Hermes at 14:02 · owner <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">infra-systems@ops</span> · proof accepted by <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">infra-monitor@ops</span> · host <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">vps-02</span></p>
+    </div>
+
+    <ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px">
+      <sc-for list="{{steps}}" as="st" hint-placeholder-count="6">
+        <li style="display: flex; flex-direction: column; gap: 6px">
+          <div style="height: 4px; border-radius: 999px; background: {{st.bar}}"></div>
+          <span style="font-size: 13px; color: {{st.text}}; font-weight: {{st.weight}}">{{st.label}}</span>
+          <span style="font-size: 12px; color: #9b9183">{{st.who}}</span>
+        </li>
+      </sc-for>
+    </ol>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+      <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+        <section style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; overflow: hidden">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #2d2924">
+            <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #f2ebdf">Queue item</h2>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">ops-disk-0142</span>
+            <span style="margin-left: auto; padding: 1px 9px; border-radius: 999px; font-size: 12px; background: #211e1a; border: 1px solid #2d2924; color: {{qColor}}; font-family: 'JetBrains Mono', monospace">state={{qstate}}</span>
+          </div>
+          <sc-for list="{{plan}}" as="p" hint-placeholder-count="3">
+            <div style="display: flex; gap: 14px; padding: 16px 18px; border-bottom: 1px solid #2d2924">
+              <span style="flex: none; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; background: {{p.dotBg}}; color: {{p.dotFg}}">{{p.mark}}</span>
+              <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 auto">
+                <div style="color: #f2ebdf">{{p.title}}</div>
+                <code style="display: block; padding: 8px 10px; border-radius: 6px; background: #12100e; border: 1px solid #2d2924; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-x: auto; white-space: pre">{{p.cmd}}</code>
+                <div style="font-size: 12px; color: #9b9183">{{p.note}}</div>
+              </div>
+            </div>
+          </sc-for>
+          <div style="padding: 14px 18px; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 12px; color: #9b9183">Proof required to close</span>
+            <span><span style="font-family: 'JetBrains Mono', monospace">df -h /</span> output under 70%, attached with rig proof add and accepted by infra-monitor@ops. Closing the item alone does not count.</span>
+          </div>
+        </section>
+
+        <section style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #f2ebdf">Guardrails Hermes checked</h2>
+          <sc-for list="{{guards}}" as="g" hint-placeholder-count="4">
+            <div style="display: flex; gap: 10px; align-items: flex-start">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c36b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>{{g}}</span>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+
+      <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+        <section style="background: #211e1a; border: 1px solid #3e3830; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <sc-if value="{{isPending}}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 14px">
+              <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #f2ebdf">Your decision</h2>
+              <p style="margin: 0; color: #9b9183">The item is blocked on you. Approving resolves it: OpenRig writes your decision onto the item and wakes the owner seat.</p>
+              <label style="display: flex; gap: 10px; align-items: flex-start; cursor: pointer; min-height: 44px">
+                <input type="checkbox" checked="{{reviewed}}" onChange="{{toggleReviewed}}" style="width: 18px; height: 18px; margin: 2px 0 0; accent-color: {{accent}}">
+                <span>I have read the three steps and the target host</span>
+              </label>
+              <button type="button" disabled="{{approveDisabled}}" onClick="{{approve}}" style="min-height: 44px; border-radius: 8px; border: 0; background: {{approveBg}}; color: {{approveFg}}; font: inherit; font-weight: 600; cursor: pointer">Approve and wake owner</button>
+              <div style="display: flex; gap: 8px">
+                <button type="button" onClick="{{revise}}" style="flex: 1 1 0; min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Ask to revise</button>
+                <button type="button" onClick="{{reject}}" style="flex: 1 1 0; min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #ffb4ab; font: inherit; cursor: pointer">Deny</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{isRunning}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #f2ebdf">Claimed by infra-systems@ops</h2>
+              <p style="margin: 0; color: #9b9183">blocked → in-progress. Watch the seat's herdr pane below. Hermes watches for the proof.</p>
+              <button type="button" onClick="{{toProof}}" style="min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Simulate: owner attaches proof</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{isProof}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #f2ebdf">Proof attached · waiting for review</h2>
+              <p style="margin: 0; color: #9b9183">Only infra-monitor@ops, the reviewer in the proof policy, can accept it.</p>
+              <button type="button" onClick="{{finish}}" style="min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Simulate: reviewer accepts</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{isVerified}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #93c36b">Done · disk now 61%</h2>
+              <p style="margin: 0; color: #9b9183">Proof accepted by infra-monitor@ops. Hermes closed the item, cleared the rig health finding and wrote the report to the audit log.</p>
+              <button type="button" onClick="{{reset}}" style="min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Replay this run</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{isStopped}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #f2ebdf">{{stoppedTitle}}</h2>
+              <p style="margin: 0; color: #9b9183">{{stoppedBody}}</p>
+              <button type="button" onClick="{{reset}}" style="min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Back to pending</button>
+            </div>
+          </sc-if>
+        </section>
+
+        <section style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #2d2924; font-size: 12px">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: {{paneDot}}"></span>
+            <span style="font-family: 'JetBrains Mono', monospace; color: #f2ebdf">{{paneSeat}}</span>
+            <span style="color: #9b9183">herdr pane · watching</span>
+            <a href="Rig.dc.html" style="margin-left: auto; font-size: 12px">Open in explorer</a>
+          </div>
+          <div style="padding: 12px 14px; background: #0d0b09; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; min-height: 200px">
+            <sc-for list="{{pane}}" as="ln" hint-placeholder-count="5">
+              <div style="color: {{ln.color}}; white-space: pre-wrap">{{ln.text}}</div>
+            </sc-for>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"$preview":{"width":1280,"height":1200}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { phase: 'pending', reviewed: false, stop: null };
+  }
+  renderVals() {
+    var self = this;
+    var accent = this.props.accent ?? '#f0a830';
+    var phase = this.state.phase;
+    var C = { working: '#6cb8d6', blocked: '#ff7b70', done: '#93c36b', idle: '#9b9183', dim: '#9b9183', text: '#d8d0c3' };
+    var revise = this.state.stop === 'revise';
+    var phases = {
+      pending: { label: 'Blocked on you', color: accent, tint: 'rgba(240, 168, 48, 0.13)', at: 2, q: 'blocked', qc: C.blocked },
+      running: { label: 'Claimed · in progress', color: C.working, tint: 'rgba(108, 184, 214, 0.14)', at: 3, q: 'in-progress', qc: C.working },
+      proof: { label: 'Proof waiting for review', color: C.working, tint: 'rgba(108, 184, 214, 0.14)', at: 4, q: 'in-progress', qc: C.working },
+      verified: { label: 'Done', color: C.done, tint: 'rgba(147, 195, 107, 0.14)', at: 6, q: 'done', qc: C.done },
+      stopped: { label: revise ? 'Sent back to Hermes' : 'Denied', color: C.blocked, tint: 'rgba(255, 123, 112, 0.14)', at: 2, q: revise ? 'blocked' : 'done', qc: revise ? C.blocked : C.dim }
+    };
+    var ph = phases[phase];
+    var steps = [['Detect', 'rig health'], ['Plan', 'Hermes'], ['Decide', 'You'], ['Claim', 'infra-systems@ops'], ['Proof', 'infra-monitor@ops'], ['Close', 'Hermes reports']].map(function (s, i) {
+      var base = { label: s[0], who: s[1] };
+      if (i < ph.at) return Object.assign(base, { bar: C.done, text: C.text, weight: 400 });
+      if (i === ph.at && phase !== 'verified') return Object.assign(base, { bar: phase === 'stopped' ? C.blocked : phase === 'pending' ? accent : C.working, text: '#f2ebdf', weight: 600 });
+      return Object.assign(base, { bar: '#2a2621', text: C.dim, weight: 400 });
+    });
+    var doneSteps = { pending: 0, running: 1, proof: 3, verified: 3, stopped: 0 }[phase];
+    var plan = [
+      { title: 'Force a log rotation for the rig logs', cmd: 'logrotate -f /etc/logrotate.d/openrig', note: 'Reversible: rotated files stay on disk until step 2.' },
+      { title: 'Compress the rotated logs', cmd: "find /var/log/openrig -name '*.log.1' -exec zstd --rm {} +", note: 'Frees about 9 GB (Hermes estimate from du).' },
+      { title: 'Check free space', cmd: 'df -h /', note: 'Pass when root is under 70% used.' }
+    ].map(function (p, i) {
+      return Object.assign(p, i < doneSteps ? { mark: '✓', dotBg: 'rgba(147, 195, 107, 0.14)', dotFg: C.done } : { mark: String(i + 1), dotBg: '#2a2621', dotFg: C.text });
+    });
+    function L(text, color) { return { text: text, color: color || C.text }; }
+    var panes = {
+      pending: [L('infra-systems@ops holding ops-disk-0142', C.dim), L('state=blocked on a human seat', C.dim), L('Waiting for the decision. Nothing has run.', C.dim)],
+      running: [L('from operator@kernel: ops-disk-0142 resolved by you, go ahead.', C.working), L('$ logrotate -f /etc/logrotate.d/openrig'), L("$ find /var/log/openrig -name '*.log.1' -exec zstd --rm {} +"), L('worker.log.1 : 11.4%   (8.2 GiB => 0.9 GiB)', C.dim)],
+      proof: [L('$ df -h /'), L('/dev/vda1   80G   49G   31G  61% /', C.dim), L('$ rig proof add ops-disk-0142 df-after.txt'), L('Proof attached. Waiting for infra-monitor@ops.', C.working)],
+      verified: [L('from infra-monitor@ops: proof accepted.', C.done), L('ops-disk-0142 closed: done.', C.done), L('rig health: vps-02 disk finding cleared.', C.dim)],
+      stopped: revise ? [L('from hermes: redrafting ops-disk-0142 with your note.', C.working), L('The item stays blocked until you decide again.', C.dim)] : [L('ops-disk-0142 closed, reason: denied.', C.blocked), L('Nothing ran on vps-02.', C.dim)]
+    };
+    var canApprove = this.state.reviewed;
+    return {
+      accent: accent,
+      steps: steps,
+      plan: plan,
+      qstate: ph.q, qColor: ph.qc,
+      guards: [
+        'A dry run on vps-02 matched only files under /var/log/openrig.',
+        'No herdr pane is taken over. The factory rig keeps its seats running.',
+        'The owner seat runs the exact commands shown, as its own user, not root.',
+        'If the check fails, the step goes back to Hermes and Hermes asks you before trying anything else.'
+      ],
+      phaseLabel: ph.label, phaseColor: ph.color, phaseTint: ph.tint,
+      isPending: phase === 'pending', isRunning: phase === 'running', isProof: phase === 'proof', isVerified: phase === 'verified', isStopped: phase === 'stopped',
+      stoppedTitle: revise ? 'Sent back to Hermes' : 'Denied',
+      stoppedBody: revise ? 'Hermes will redraft the plan and ask you again. Nothing ran.' : 'The item is closed as denied and logged. Nothing ran on vps-02.',
+      reviewed: this.state.reviewed,
+      approveDisabled: !canApprove,
+      approveBg: canApprove ? accent : '#2a2621',
+      approveFg: canApprove ? '#1b1407' : '#9b9183',
+      paneSeat: phase === 'proof' || phase === 'verified' ? 'infra-monitor@ops' : 'infra-systems@ops',
+      paneDot: phase === 'running' || phase === 'proof' ? C.working : phase === 'verified' ? C.done : C.idle,
+      pane: panes[phase],
+      toggleReviewed: function () { self.setState({ reviewed: !self.state.reviewed }); },
+      approve: function () { if (self.state.reviewed) self.setState({ phase: 'running' }); },
+      toProof: function () { self.setState({ phase: 'proof' }); },
+      finish: function () { self.setState({ phase: 'verified' }); },
+      reject: function () { self.setState({ phase: 'stopped', stop: 'reject' }); },
+      revise: function () { self.setState({ phase: 'stopped', stop: 'revise' }); },
+      reset: function () { self.setState({ phase: 'pending', reviewed: false, stop: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Motoko overview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#12100e}
+a{color:#f0a830}a:hover{color:#f6bb55}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #12100e; color: #d8d0c3; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 0 20px; min-height: 52px; background: #181613; border-bottom: 1px solid #2d2924">
+    <div style="display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #f2ebdf; font-size: 15px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+      herdr
+    </div>
+    <nav aria-label="Primary" style="display: flex; flex-wrap: wrap; gap: 4px">
+      <a href="#" style="padding: 15px 12px; color: #9b9183; text-decoration: none">Panes</a>
+      <a href="#" style="padding: 15px 12px; color: #9b9183; text-decoration: none">Agents</a>
+      <a href="#" aria-current="page" style="padding: 15px 12px 13px; color: #f2ebdf; text-decoration: none; border-bottom: 2px solid {{accent}}; font-weight: 500">Motoko</a>
+    </nav>
+    <div style="flex: 1 1 auto"></div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px">
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid #2d2924; border-radius: 999px; background: #211e1a"><span style="width: 7px; height: 7px; border-radius: 50%; background: #93c36b"></span>Bridge connected</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid #2d2924; border-radius: 999px; background: #211e1a"><span style="width: 7px; height: 7px; border-radius: 50%; background: #93c36b"></span>rig daemon · vps-01</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid #2d2924; border-radius: 999px; background: #211e1a"><img src="../hermes-logo-white.svg" alt="" style="width: 14px; height: 14px; object-fit: contain"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>Hermes · orchestrating</span>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-start">
+
+    <aside style="flex: 1 1 220px; max-width: 260px; box-sizing: border-box; padding: 20px 12px; border-right: 1px solid #2d2924; display: flex; flex-direction: column; gap: 24px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9b9183; padding: 0 10px 6px">Motoko</div>
+        <a href="#" aria-current="page" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; background: rgba(240, 168, 48, 0.13); color: #f2ebdf; text-decoration: none; min-height: 26px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Overview</a>
+        <a href="#vps" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; min-height: 26px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.5"></rect><rect x="3" y="13" width="18" height="7" rx="1.5"></rect><line x1="7" y1="7.5" x2="7.01" y2="7.5"></line><line x1="7" y1="16.5" x2="7.01" y2="16.5"></line></svg>Hosts</a>
+        <a href="Rig.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; min-height: 26px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"></circle><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="19" r="2.5"></circle><path d="M12 7.5v4M12 11.5l-5.5 5M12 11.5l5.5 5"></path></svg>Rig explorer</a>
+        <a href="#attention" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; min-height: 26px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>Attention<span style="margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: {{accent}}; color: #1b1407; font-weight: 600">2</span></a>
+        <a href="#ops" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; min-height: 26px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"></path><circle cx="18" cy="6" r="2"></circle><circle cx="15" cy="18" r="2"></circle></svg>Operations</a>
+        <a href="#log" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; min-height: 26px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6M8 13h8M8 17h5"></path></svg>Audit log</a>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9b9183; padding: 0 10px 6px">Rigs · herdr workspaces</div>
+        <sc-for list="{{rigs}}" as="w" hint-placeholder-count="3">
+          <a href="Rig.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: #d8d0c3; text-decoration: none; font-family: 'JetBrains Mono', monospace; font-size: 13px">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: {{w.dot}}; flex: none"></span>{{w.name}}<span style="margin-left: auto; color: #9b9183; font-size: 11px">{{w.seatCount}} seats</span>
+          </a>
+        </sc-for>
+      </div>
+    </aside>
+
+    <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 32px; max-width: 1180px">
+
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 320px">
+          <h1 style="margin: 0; font-size: 28px; font-weight: 600; color: #f2ebdf; letter-spacing: -0.01em">Motoko</h1>
+          <p style="margin: 0; color: #9b9183">Your Hermes agent, running OpenRig rigs across your VPS hosts. Every seat is a herdr pane you can watch. Every change waits for your decision.</p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #d8d0c3; font: inherit; cursor: pointer">Pause Hermes dispatch</button>
+          <a href="Ask.dc.html" style="display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 8px; background: {{accent}}; color: #1b1407; text-decoration: none; font-weight: 600">Ask Motoko</a>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+        <sc-for list="{{summary}}" as="s" hint-placeholder-count="5">
+          <div style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+            <div style="font-size: 12px; color: #9b9183">{{s.label}}</div>
+            <div style="font-size: 26px; font-weight: 600; color: #f2ebdf; font-family: 'JetBrains Mono', monospace">{{s.value}}</div>
+            <div style="font-size: 12px; color: {{s.noteColor}}">{{s.note}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <section id="vps" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #f2ebdf">VPS hosts</h2>
+          <span style="font-size: 12px; color: #9b9183">Machine health polled by Hermes every 30 s · OpenRig checks from rig doctor and rig health</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px">
+          <sc-for list="{{hosts}}" as="h" hint-placeholder-count="2">
+            <article style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px">
+              <div style="display: flex; align-items: flex-start; gap: 12px">
+                <div style="display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto">
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 15px; color: #f2ebdf">{{h.name}}</div>
+                  <div style="font-size: 12px; color: #9b9183">{{h.role}} · up {{h.uptime}}</div>
+                </div>
+                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; background: {{h.stateTint}}; color: {{h.stateColor}}"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{h.stateColor}}"></span>{{h.state}}</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 10px">
+                <sc-for list="{{h.metrics}}" as="m" hint-placeholder-count="3">
+                  <div style="display: grid; grid-template-columns: 56px 1fr 44px; align-items: center; gap: 10px; font-size: 12px">
+                    <span style="color: #9b9183">{{m.label}}</span>
+                    <div style="height: 6px; border-radius: 999px; background: #2a2621; overflow: hidden"><div style="height: 6px; border-radius: 999px; width: {{m.pct}}; background: {{m.color}}"></div></div>
+                    <span style="text-align: right; font-family: 'JetBrains Mono', monospace; color: #d8d0c3">{{m.pct}}</span>
+                  </div>
+                </sc-for>
+                <div style="display: grid; grid-template-columns: 56px 1fr 44px; align-items: center; gap: 10px; font-size: 12px">
+                  <span style="color: #9b9183">Load</span>
+                  <svg width="160" height="24" viewBox="0 0 160 28" preserveAspectRatio="none" role="img" aria-label="Load average, last hour" style="width: 100%"><polyline points="{{h.spark}}" fill="none" stroke="#6cb8d6" stroke-width="1.6" stroke-linejoin="round"></polyline></svg>
+                  <span style="text-align: right; font-family: 'JetBrains Mono', monospace">{{h.load}}</span>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-radius: 8px; background: #211e1a; font-size: 12px">
+                <div style="display: flex; flex-direction: column; gap: 2px"><span style="color: #9b9183">rig doctor</span><span style="color: {{h.doctorColor}}">{{h.doctor}}</span></div>
+                <div style="display: flex; flex-direction: column; gap: 2px"><span style="color: #9b9183">rig health</span><span style="color: {{h.healthColor}}">{{h.health}}</span></div>
+                <div style="display: flex; flex-direction: column; gap: 2px"><span style="color: #9b9183">tmux seats</span><span style="font-family: 'JetBrains Mono', monospace">{{h.seats}}</span></div>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                <sc-for list="{{h.services}}" as="sv" hint-placeholder-count="3">
+                  <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 6px; background: #211e1a; border: 1px solid #2d2924; font-family: 'JetBrains Mono', monospace; font-size: 12px"><span style="width: 6px; height: 6px; border-radius: 50%; background: {{sv.color}}"></span>{{sv.name}}</span>
+                </sc-for>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+      </section>
+
+      <section id="openrig" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #f2ebdf">OpenRig rigs</h2>
+          <span style="font-size: 12px; color: #9b9183">Live seat activity from the rig daemon. OpenRig shows unknown rather than guessing idle.</span>
+          <span style="flex: 1 1 auto"></span>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #9b9183">
+            <sc-for list="{{legend}}" as="lg" hint-placeholder-count="4">
+              <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; background: {{lg.bg}}; border: {{lg.border}}"></span>{{lg.label}}</span>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px">
+          <sc-for list="{{rigs}}" as="r" hint-placeholder-count="3">
+            <article style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; display: flex; flex-direction: column">
+              <div style="padding: 16px 16px 12px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid #2d2924">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; color: #f2ebdf">{{r.name}}</span>
+                  <span style="font-size: 12px; color: #9b9183">{{r.spec}}</span>
+                  <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">{{r.host}}</span>
+                </div>
+                <div style="font-size: 12px; color: #9b9183">{{r.purpose}}</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px">
+                  <sc-for list="{{r.queue}}" as="q" hint-placeholder-count="4">
+                    <span style="padding: 1px 8px; border-radius: 999px; font-size: 11px; background: #211e1a; border: 1px solid #2d2924; color: {{q.color}}"><span style="font-family: 'JetBrains Mono', monospace">{{q.n}}</span> {{q.label}}</span>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; padding: 6px 0; flex: 1 1 auto">
+                <sc-for list="{{r.seats}}" as="s" hint-placeholder-count="3">
+                  <div style="display: flex; align-items: center; gap: 10px; padding: 6px 16px; font-size: 12px">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; flex: none; background: {{s.bg}}; border: {{s.border}}"></span>
+                    <span style="font-family: 'JetBrains Mono', monospace; color: #f2ebdf; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{s.address}}</span>
+                    <span style="color: #9b9183">{{s.runtime}}</span>
+                    <span style="margin-left: auto; color: {{s.color}}">{{s.activity}}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #2d2924">
+                <a href="Rig.dc.html" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; border-radius: 6px; border: 1px solid #3e3830; color: #d8d0c3; text-decoration: none; font-size: 12px">Explore rig</a>
+                <a href="#" style="flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; border-radius: 6px; border: 1px solid #3e3830; color: #d8d0c3; text-decoration: none; font-size: 12px">Open tiles in herdr</a>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+      </section>
+
+      <section id="attention" style="display: flex; flex-wrap: wrap; gap: 14px">
+        <div style="flex: 3 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #f2ebdf">Waiting for you</h2>
+            <span style="font-size: 12px; color: #9b9183">Decision requests from the OpenRig attention view and from Hermes</span>
+          </div>
+          <div style="background: #181613; border: 1px solid #2d2924; border-radius: 12px">
+            <sc-for list="{{decisions}}" as="d" hint-placeholder-count="2">
+              <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #2d2924">
+                <div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px">
+                    <span style="font-family: 'JetBrains Mono', monospace; color: #9b9183">{{d.id}}</span>
+                    <span style="padding: 1px 8px; border-radius: 999px; background: rgba(255, 123, 112, 0.14); color: #ff7b70">blocked on you</span>
+                  </div>
+                  <div style="color: #f2ebdf">{{d.summary}}</div>
+                  <div style="font-size: 12px; color: #9b9183">from <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">{{d.source}}</span> · owner <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">{{d.owner}}</span></div>
+                </div>
+                <a href="Workflow.dc.html" style="display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 8px; background: {{accent}}; color: #1b1407; text-decoration: none; font-weight: 600">Decide</a>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="flex: 2 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #f2ebdf">Parked seats</h2>
+            <span style="font-size: 12px; color: #9b9183">From rig parked</span>
+          </div>
+          <div style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #ff7b70"></span>
+              <span style="font-family: 'JetBrains Mono', monospace; color: #f2ebdf">dev-builder@factory</span>
+              <span style="margin-left: auto; color: #ff7b70">needs-input</span>
+            </div>
+            <div style="color: #d8d0c3">At a permission prompt while holding <span style="font-family: 'JetBrains Mono', monospace">build-0311</span>. Hermes will not answer it for you.</div>
+            <a href="Rig.dc.html" style="display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 8px; border: 1px solid #3e3830; color: #d8d0c3; text-decoration: none">Open its pane</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="ops" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #f2ebdf">Operations workflow</h2>
+          <span style="font-size: 12px; color: #9b9183">Hermes plans, you decide, a seat owns the queue item, a reviewer accepts the proof</span>
+        </div>
+        <div style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 20px">
+          <ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px">
+            <sc-for list="{{steps}}" as="st" hint-placeholder-count="6">
+              <li style="display: flex; flex-direction: column; gap: 8px">
+                <div style="height: 4px; border-radius: 999px; background: {{st.bar}}"></div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: {{st.text}}; font-weight: {{st.weight}}"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #9b9183">{{st.n}}</span>{{st.label}}</div>
+                <div style="font-size: 12px; color: #9b9183">{{st.who}}</div>
+              </li>
+            </sc-for>
+          </ol>
+          <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 18px; border-radius: 8px; background: #211e1a; border: 1px solid #3e3830">
+            <div style="flex: 1 1 360px; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">ops-disk-0142</span>
+                <span style="padding: 2px 9px; border-radius: 999px; font-size: 12px; background: rgba(240, 168, 48, 0.13); color: {{accent}}">Awaiting your decision</span>
+                <span style="padding: 2px 9px; border-radius: 999px; font-size: 12px; background: #2a2621; color: #d8d0c3">Risk: low</span>
+              </div>
+              <div style="font-size: 16px; color: #f2ebdf; font-weight: 500">Free disk on vps-02: rotate and compress rig logs</div>
+              <p style="margin: 0; color: #9b9183">rig health flagged disk at 88% on vps-02. Hermes drafted a queue item for <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">infra-systems@ops</span>, with <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">infra-monitor@ops</span> accepting the proof. The factory rig keeps running.</p>
+              <pre style="margin: 0; padding: 12px 14px; border-radius: 6px; background: #12100e; border: 1px solid #2d2924; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; color: #d8d0c3; overflow-x: auto">qitem   ops-disk-0142   host vps-02
+owner   infra-systems@ops       source hermes
+state   blocked · decision requested from you
+steps   1  logrotate -f /etc/logrotate.d/openrig
+        2  zstd --rm the rotated *.log.1 files
+        3  df -h /     pass when under 70%
+proof   df output, accepted by infra-monitor@ops</pre>
+            </div>
+            <div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end">
+              <a href="Workflow.dc.html" style="display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; background: {{accent}}; color: #1b1407; text-decoration: none; font-weight: 600">Review and decide</a>
+              <button type="button" style="min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; cursor: pointer">Ask Hermes to revise</button>
+              <button type="button" style="min-height: 44px; border-radius: 8px; border: 1px solid #3e3830; background: transparent; color: #ffb4ab; font: inherit; cursor: pointer">Deny</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <sc-if value="{{showLog}}" hint-placeholder-val="{{ true }}">
+        <section id="log" style="display: flex; flex-direction: column; gap: 14px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #f2ebdf">Activity</h2>
+          <div style="background: #181613; border: 1px solid #2d2924; border-radius: 12px; padding: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-x: auto">
+            <sc-for list="{{log}}" as="l" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: 72px 168px minmax(280px, 1fr); gap: 12px; padding: 7px 16px">
+                <span style="color: #9b9183">{{l.t}}</span>
+                <span style="color: {{l.color}}">{{l.who}}</span>
+                <span style="color: #d8d0c3">{{l.msg}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"showLog":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":2000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var C = { working: '#6cb8d6', blocked: '#ff7b70', done: '#93c36b', idle: '#9b9183', warn: '#f9e2af' };
+    var T = { done: 'rgba(147, 195, 107, 0.14)', warn: 'rgba(249, 226, 175, 0.12)' };
+    var accent = this.props.accent ?? '#f0a830';
+    var ACT = {
+      'working': { bg: C.working, border: '0', color: C.working },
+      'idle': { bg: C.idle, border: '0', color: C.idle },
+      'needs-input': { bg: C.blocked, border: '0', color: C.blocked },
+      'unknown': { bg: 'transparent', border: '1.5px dashed #9b9183', color: '#9b9183' }
+    };
+    function metric(label, pct) {
+      return { label: label, pct: pct + '%', color: pct >= 85 ? C.blocked : pct >= 75 ? C.warn : C.done };
+    }
+    function spark(vals) {
+      var max = Math.max.apply(null, vals);
+      return vals.map(function (v, i) { return (i * (160 / (vals.length - 1))).toFixed(1) + ',' + (26 - (v / max) * 22).toFixed(1); }).join(' ');
+    }
+    function seat(address, runtime, activity) { return Object.assign({ address: address, runtime: runtime, activity: activity }, ACT[activity]); }
+    function queue(p, ip, b, d) {
+      return [{ n: p, label: 'pending', color: '#d8d0c3' }, { n: ip, label: 'in progress', color: C.working }, { n: b, label: 'blocked', color: b ? C.blocked : '#9b9183' }, { n: d, label: 'done today', color: C.done }];
+    }
+    var rigs = [
+      { name: 'kernel', spec: 'built-in', host: 'vps-01', purpose: 'Advisor and operator. Hermes hands rig work to the operator.', dot: C.working,
+        queue: queue(0, 1, 0, 3), seats: [seat('advisor@kernel', 'claude-code', 'idle'), seat('operator@kernel', 'claude-code', 'working')] },
+      { name: 'factory', spec: 'factory spec', host: 'vps-02', purpose: '[YOUR PROJECT]: build and review.', dot: C.blocked,
+        queue: queue(2, 4, 1, 6), seats: [seat('orch-lead@factory', 'claude-code', 'working'), seat('orch-advisor@factory', 'codex', 'idle'), seat('dev-builder@factory', 'claude-code', 'needs-input'), seat('dev-designer@factory', 'codex', 'working'), seat('qa-test@factory', 'claude-code', 'working'), seat('review-a@factory', 'claude-code', 'idle'), seat('review-b@factory', 'codex', 'unknown')] },
+      { name: 'ops', spec: 'ops.yaml', host: 'vps-01', purpose: 'Keep the VPS hosts and services healthy.', dot: C.working,
+        queue: queue(0, 1, 1, 2), seats: [seat('infra-systems@ops', 'claude-code', 'idle'), seat('infra-monitor@ops', 'codex', 'working'), seat('release-deploy@ops', 'codex', 'idle')] }
+    ].map(function (r) { return Object.assign(r, { seatCount: r.seats.length }); });
+    var stepState = function (s) {
+      if (s === 'done') return { bar: C.done, text: '#d8d0c3', weight: 400 };
+      if (s === 'now') return { bar: accent, text: '#f2ebdf', weight: 600 };
+      return { bar: '#2a2621', text: '#9b9183', weight: 400 };
+    };
+    var steps = [
+      ['Detect', 'rig health · disk 88%', 'done'],
+      ['Plan', 'Hermes drafts queue item', 'done'],
+      ['Decide', 'You', 'now'],
+      ['Claim', 'infra-systems@ops', 'todo'],
+      ['Proof', 'infra-monitor@ops accepts', 'todo'],
+      ['Close', 'done · Hermes reports', 'todo']
+    ].map(function (s, i) { return Object.assign({ n: '0' + (i + 1), label: s[0], who: s[1] }, stepState(s[2])); });
+    return {
+      accent: accent,
+      showLog: this.props.showLog ?? true,
+      rigs: rigs,
+      legend: ['working', 'idle', 'needs-input', 'unknown'].map(function (k) { return { label: k, bg: ACT[k].bg, border: ACT[k].border }; }),
+      summary: [
+        { label: 'Hosts healthy', value: '1/2', note: 'vps-02 disk 88%', noteColor: C.warn },
+        { label: 'Seats working', value: '5/12', note: '3 rigs up', noteColor: '#9b9183' },
+        { label: 'Needs input', value: '1', note: 'dev-builder@factory', noteColor: C.blocked },
+        { label: 'Waiting for you', value: '2', note: 'decision requests', noteColor: accent },
+        { label: 'Claude 5-hour usage', value: '62%', note: 'from rig provider status', noteColor: '#9b9183' }
+      ],
+      hosts: [
+        { name: 'vps-01', role: 'Hermes, rig daemon, herdr', uptime: '41d 6h', state: 'Healthy', stateColor: C.done, stateTint: T.done,
+          metrics: [metric('CPU', 34), metric('Memory', 58), metric('Disk', 47)], spark: spark([3, 4, 3, 5, 6, 4, 5, 4, 3, 4, 5, 4]), load: '0.82',
+          doctor: 'passed', doctorColor: C.done, health: 'no findings', healthColor: C.done, seats: '5',
+          services: [{ name: 'herdr', color: C.done }, { name: 'rig daemon', color: C.done }, { name: 'hermes', color: C.done }, { name: 'herdr-web', color: C.done }] },
+        { name: 'vps-02', role: 'factory rig host (--host vps-02)', uptime: '12d 3h', state: 'Disk warning', stateColor: C.warn, stateTint: T.warn,
+          metrics: [metric('CPU', 71), metric('Memory', 79), metric('Disk', 88)], spark: spark([5, 6, 8, 7, 9, 10, 9, 11, 10, 12, 11, 10]), load: '2.41',
+          doctor: 'passed', doctorColor: C.done, health: '1 finding: disk', healthColor: C.warn, seats: '7',
+          services: [{ name: 'herdr', color: C.done }, { name: 'tmux', color: C.done }, { name: 'logrotate', color: C.warn }] }
+      ],
+      decisions: [
+        { id: 'ops-disk-0142', summary: 'Free disk on vps-02 by rotating and compressing rig logs.', source: 'hermes', owner: 'infra-systems@ops' },
+        { id: 'ops-release-007', summary: 'Deploy the release candidate to staging. Prepared and held for your approval.', source: 'orch-lead@factory', owner: 'release-deploy@ops' }
+      ],
+      steps: steps,
+      log: [
+        { t: '14:02:40', who: 'hermes', color: C.working, msg: 'Drafted ops-disk-0142 for infra-systems@ops. Decision requested from you.' },
+        { t: '14:02:11', who: 'rig health', color: C.warn, msg: 'vps-02: disk 88% used.' },
+        { t: '13:58:03', who: 'dev-builder@factory', color: C.blocked, msg: 'At a permission prompt while holding build-0311.' },
+        { t: '13:44:19', who: 'infra-monitor@ops', color: C.done, msg: 'Proof accepted for ops-restart-0141. Closed as done.' },
+        { t: '13:41:27', who: 'hermes', color: C.working, msg: 'rig restore-check factory: every seat would resume.' },
+        { t: '13:40:02', who: 'you', color: accent, msg: 'Approved ops-restart-0141.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

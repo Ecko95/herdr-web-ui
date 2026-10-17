@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ask Motoko</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#12100e}
+a{color:#f0a830}a:hover{color:#f6bb55}
+@keyframes motoko-ring{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.55);opacity:0}}
+@keyframes motoko-bar{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important}}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #12100e; color: #d8d0c3; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 0 20px; min-height: 52px; background: #181613; border-bottom: 1px solid #2d2924">
+    <div style="display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #f2ebdf; font-size: 15px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+      herdr
+    </div>
+    <nav aria-label="Primary" style="display: flex; flex-wrap: wrap; gap: 4px">
+      <a href="#" style="padding: 15px 12px; color: #9b9183; text-decoration: none">Panes</a>
+      <a href="#" style="padding: 15px 12px; color: #9b9183; text-decoration: none">Agents</a>
+      <a href="Main.dc.html" aria-current="page" style="padding: 15px 12px 13px; color: #f2ebdf; text-decoration: none; border-bottom: 2px solid {{accent}}; font-weight: 500">Motoko</a>
+    </nav>
+    <div style="flex: 1 1 auto"></div>
+    <div role="group" aria-label="View" style="display: inline-flex; padding: 3px; border-radius: 8px; background: #211e1a; border: 1px solid #2d2924">
+      <button type="button" aria-pressed="{{isChat}}" onClick="{{toChat}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border: 0; border-radius: 6px; background: {{chatTabBg}}; color: {{chatTabFg}}; font: inherit; font-size: 13px; cursor: pointer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Chat</button>
+      <button type="button" aria-pressed="{{isTerminal}}" onClick="{{toTerminal}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border: 0; border-radius: 6px; background: {{termTabBg}}; color: {{termTabFg}}; font: inherit; font-size: 13px; cursor: pointer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>Terminal</button>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: stretch; flex: 1 1 auto">
+
+    <aside style="flex: 1 1 220px; max-width: 260px; box-sizing: border-box; padding: 16px 12px; border-right: 1px solid #2d2924; display: flex; flex-direction: column; gap: 20px">
+      <button type="button" onClick="{{newChat}}" style="display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; font: inherit; cursor: pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New conversation</button>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9b9183; padding: 0 10px 6px">Conversations</div>
+        <sc-for list="{{threads}}" as="th" hint-placeholder-count="4">
+          <a href="#" style="display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 6px; background: {{th.bg}}; color: #d8d0c3; text-decoration: none">
+            <span style="color: {{th.fg}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{th.title}}</span>
+            <span style="font-size: 12px; color: #9b9183">{{th.when}}</span>
+          </a>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 8px; background: #181613; border: 1px solid #2d2924; font-size: 12px">
+        <div style="color: #9b9183">Motoko can see</div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #f9e2af"></span>2 VPS hosts</div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>3 rigs · 12 seats</div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{accent}}"></span>2 decisions waiting</div>
+        <div style="color: #9b9183; padding-top: 4px; border-top: 1px solid #2d2924">Motoko proposes. Anything that changes a host or a rig waits for your decision.</div>
+      </div>
+    </aside>
+
+    <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: {{heroPad}}; border-bottom: 1px solid #2d2924">
+        <div style="position: relative; width: {{logoSize}}; height: {{logoSize}}; display: flex; align-items: center; justify-content: center">
+          <sc-if value="{{isVoice}}" hint-placeholder-val="{{ false }}">
+            <span aria-hidden="true" style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid {{accent}}; animation: motoko-ring 2.4s ease-out infinite"></span>
+            <span aria-hidden="true" style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid {{accent}}; animation: motoko-ring 2.4s ease-out 1.2s infinite"></span>
+          </sc-if>
+          <div style="position: relative; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%; background: #181613; border: 2px solid {{accent}}; display: flex; align-items: center; justify-content: center">
+            <img src="../hermes-logo-white.svg" alt="Hermes Agent" style="width: 60%; height: 60%; object-fit: contain">
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center">
+          <h1 style="margin: 0; font-size: {{titleSize}}; font-weight: 600; color: #f2ebdf; letter-spacing: -0.01em">Ask Motoko</h1>
+          <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #9b9183">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: {{statusDot}}"></span>{{statusText}}
+          </div>
+        </div>
+      </div>
+
+      <sc-if value="{{isChat}}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0">
+          <div role="log" aria-label="Conversation with Motoko" style="flex: 1 1 auto; overflow-y: auto; padding: 24px 24px 8px">
+            <div style="max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px">
+
+              <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 12px 0">
+                  <p style="margin: 0; color: #9b9183; text-align: center; max-width: 460px">Ask about your hosts, rigs and seats, or hand Motoko a job. It drafts the plan; you decide.</p>
+                </div>
+              </sc-if>
+
+              <sc-for list="{{messages}}" as="m" hint-placeholder-count="4">
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <sc-if value="{{m.isUser}}" hint-placeholder-val="{{ false }}">
+                    <div style="align-self: flex-end; max-width: 78%; padding: 10px 14px; border-radius: 14px 14px 4px 14px; background: #211e1a; border: 1px solid #2d2924; color: #f2ebdf; white-space: pre-wrap">{{m.text}}</div>
+                    <sc-if value="{{m.spoken}}" hint-placeholder-val="{{ false }}">
+                      <div style="align-self: flex-end; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #9b9183">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0M12 17v5"></path></svg>spoken</div>
+                    </sc-if>
+                  </sc-if>
+                  <sc-if value="{{m.isHermes}}" hint-placeholder-val="{{ true }}">
+                    <div style="display: flex; gap: 12px; align-items: flex-start">
+                      <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; align-items: center; justify-content: center"><img src="../hermes-logo-white.svg" alt="" style="width: 18px; height: 18px; object-fit: contain"></span>
+                      <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+                        <sc-if value="{{m.hasTools}}" hint-placeholder-val="{{ false }}">
+                          <div style="display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: 8px; background: #181613; border: 1px solid #2d2924; font-family: 'JetBrains Mono', monospace; font-size: 12px">
+                            <sc-for list="{{m.tools}}" as="tl" hint-placeholder-count="3">
+                              <div style="display: flex; gap: 8px; align-items: baseline"><span style="color: #93c36b">✓</span><span style="color: #d8d0c3">{{tl.cmd}}</span><span style="margin-left: auto; color: #9b9183">{{tl.result}}</span></div>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                        <div style="color: #d8d0c3; white-space: pre-wrap">{{m.text}}</div>
+                        <sc-if value="{{m.hasDecisions}}" hint-placeholder-val="{{ false }}">
+                          <div style="display: flex; flex-direction: column; border-radius: 10px; background: #181613; border: 1px solid #2d2924; overflow: hidden">
+                            <sc-for list="{{decisions}}" as="d" hint-placeholder-count="2">
+                              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #2d2924">
+                                <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">{{d.id}} · owner {{d.owner}}</span>
+                                  <span style="color: #f2ebdf">{{d.summary}}</span>
+                                </div>
+                                <a href="Workflow.dc.html" style="display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 8px; background: {{accent}}; color: #1b1407; text-decoration: none; font-weight: 600; font-size: 13px">Review</a>
+                              </div>
+                            </sc-for>
+                            <a href="Rig.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; color: #d8d0c3; text-decoration: none; font-size: 13px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #ff7b70"></span>dev-builder@factory is at a permission prompt. Open its pane</a>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{m.hasHost}}" hint-placeholder-val="{{ false }}">
+                          <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 10px; background: #181613; border: 1px solid #2d2924; max-width: 460px">
+                            <div style="display: flex; align-items: center; gap: 8px"><span style="font-family: 'JetBrains Mono', monospace; color: #f2ebdf">vps-02</span><span style="font-size: 12px; color: #9b9183">factory rig host · up 12d 3h</span><span style="margin-left: auto; font-size: 12px; color: #f9e2af">Disk warning</span></div>
+                            <sc-for list="{{hostMetrics}}" as="hm" hint-placeholder-count="3">
+                              <div style="display: grid; grid-template-columns: 56px 1fr 40px; align-items: center; gap: 10px; font-size: 12px">
+                                <span style="color: #9b9183">{{hm.label}}</span>
+                                <div style="height: 6px; border-radius: 999px; background: #2a2621; overflow: hidden"><div style="height: 6px; width: {{hm.pct}}; background: {{hm.color}}"></div></div>
+                                <span style="text-align: right; font-family: 'JetBrains Mono', monospace">{{hm.pct}}</span>
+                              </div>
+                            </sc-for>
+                            <a href="Main.dc.html" style="font-size: 12px">Open in Hosts</a>
+                          </div>
+                        </sc-if>
+                        <div style="display: flex; gap: 4px">
+                          <button type="button" aria-label="Read aloud" title="Read aloud" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: #9b9183; cursor: pointer">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"></path></svg></button>
+                          <button type="button" aria-label="Copy" title="Copy" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: #9b9183; cursor: pointer">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+
+              <sc-if value="{{pending}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; gap: 12px; align-items: center; color: #9b9183; font-size: 13px">
+                  <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; align-items: center; justify-content: center"><img src="../hermes-logo-white.svg" alt="" style="width: 18px; height: 18px; object-fit: contain"></span>
+                  Motoko is checking the rigs…
+                </div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="padding: 8px 24px 20px">
+            <div style="max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px">
+
+              <div role="group" aria-label="Quick asks" style="display: flex; flex-wrap: wrap; gap: 6px">
+                <sc-for list="{{chips}}" as="c" hint-placeholder-count="4">
+                  <button type="button" onClick="{{c.pick}}" style="min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #3e3830; background: transparent; color: #d8d0c3; font: inherit; font-size: 13px; cursor: pointer">{{c.label}}</button>
+                </sc-for>
+              </div>
+
+              <sc-if value="{{isVoice}}" hint-placeholder-val="{{ false }}">
+                <div role="group" aria-label="Voice conversation" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: #181613; border: 1px solid {{accent}}">
+                  <div style="display: flex; align-items: center; gap: 3px; height: 28px" aria-hidden="true">
+                    <sc-for list="{{bars}}" as="b" hint-placeholder-count="7">
+                      <span style="width: 4px; height: 26px; border-radius: 2px; background: {{accent}}; transform-origin: center; animation: motoko-bar 1s ease-in-out {{b.delay}} infinite"></span>
+                    </sc-for>
+                  </div>
+                  <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column">
+                    <span style="font-size: 12px; color: #9b9183">Listening · Motoko replies out loud</span>
+                    <span style="color: #f2ebdf">“Is anything waiting for me on the ops rig…”</span>
+                  </div>
+                  <button type="button" aria-label="Mute microphone" title="Mute microphone" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #3e3830; background: #211e1a; color: #d8d0c3; cursor: pointer">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" y1="2" x2="22" y2="22"></line><path d="M18.89 13.23A7 7 0 0 0 19 12v-2M5 10v2a7 7 0 0 0 12 5M15 9.34V5a3 3 0 0 0-5.68-1.33M9 9v3a3 3 0 0 0 5.12 2.12M12 19v3"></path></svg></button>
+                  <button type="button" onClick="{{endVoice}}" style="min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; background: #ff7b70; color: #1b0d0b; font: inherit; font-weight: 600; cursor: pointer">End voice</button>
+                  <div style="flex-basis: 100%; font-size: 12px; color: #9b9183">Spoken requests that change a host or a rig still open a decision for you to confirm on screen.</div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{showComposer}}" hint-placeholder-val="{{ true }}">
+                <div role="group" aria-label="Message composer" style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 14px; background: #1c1916; border: 1px solid #3e3830">
+                  <sc-if value="{{isDictating}}" hint-placeholder-val="{{ false }}">
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 999px; background: rgba(255, 123, 112, 0.12)">
+                      <button type="button" onClick="{{cancelDictation}}" aria-label="Cancel dictation" title="Cancel dictation" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: #2a2621; color: #d8d0c3; cursor: pointer">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                      <span style="width: 8px; height: 8px; border-radius: 50%; background: #ff7b70"></span>
+                      <span style="font-size: 13px; color: #ffd9d4">Recording</span>
+                      <div style="display: flex; align-items: center; gap: 3px; height: 18px" aria-hidden="true">
+                        <sc-for list="{{bars}}" as="b" hint-placeholder-count="7">
+                          <span style="width: 3px; height: 16px; border-radius: 2px; background: #ff7b70; transform-origin: center; animation: motoko-bar 1s ease-in-out {{b.delay}} infinite"></span>
+                        </sc-for>
+                      </div>
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">0:04</span>
+                      <button type="button" onClick="{{insertDictation}}" aria-label="Insert dictation" title="Insert dictation" style="margin-left: auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: {{accent}}; color: #1b1407; cursor: pointer">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+                    </div>
+                  </sc-if>
+                  <label style="display: block">
+                    <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Message Motoko</span>
+                    <textarea rows="2" value="{{draft}}" onChange="{{onDraft}}" onKeyDown="{{onKey}}" placeholder="Message Motoko…" style="width: 100%; box-sizing: border-box; resize: none; border: 0; background: transparent; color: #f2ebdf; font: inherit; font-size: 15px; outline: none; padding: 4px 2px"></textarea>
+                  </label>
+                  <div style="display: flex; align-items: center; gap: 6px">
+                    <button type="button" aria-label="Attach a file" title="Attach a file" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: #9b9183; cursor: pointer">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border-radius: 999px; background: #211e1a; border: 1px solid #2d2924; font-size: 12px; color: #9b9183">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"></circle><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="19" r="2.5"></circle><path d="M12 7.5v4M12 11.5l-5.5 5M12 11.5l5.5 5"></path></svg>All rigs</span>
+                    <span style="flex: 1 1 auto"></span>
+                    <svg width="18" height="18" viewBox="0 0 16 16" role="img" aria-label="Context 72% left"><circle cx="8" cy="8" r="6" fill="none" stroke="#2a2621" stroke-width="2.2"></circle><circle cx="8" cy="8" r="6" fill="none" stroke="#9b9183" stroke-width="2.2" stroke-dasharray="10.6 37.7" transform="rotate(-90 8 8)"></circle></svg>
+                    <button type="button" onClick="{{dictate}}" aria-label="Dictate (hold)" title="Dictate (hold) · Ctrl+Shift+Space" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: {{micBg}}; color: {{micFg}}; cursor: pointer">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0M12 17v5"></path></svg></button>
+                    <button type="button" onClick="{{startVoice}}" aria-label="Talk to Motoko" title="Talk to Motoko (hands-free)" style="display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #d8d0c3; font: inherit; font-size: 13px; cursor: pointer">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="10" x2="4" y2="14"></line><line x1="8" y1="6" x2="8" y2="18"></line><line x1="12" y1="3" x2="12" y2="21"></line><line x1="16" y1="7" x2="16" y2="17"></line><line x1="20" y1="10" x2="20" y2="14"></line></svg>Voice</button>
+                    <button type="button" onClick="{{send}}" aria-label="Send" title="Send" disabled="{{sendDisabled}}" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: {{sendBg}}; color: {{sendFg}}; cursor: pointer">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg></button>
+                  </div>
+                </div>
+                <div style="font-size: 12px; color: #9b9183; text-align: center">Dictation goes into the box and is never sent on its own. Enter sends, Shift+Enter adds a line.</div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isTerminal}}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1 1 auto; display: flex; flex-direction: column; padding: 16px 24px 20px; gap: 10px; min-height: 0">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9b9183">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #6cb8d6"></span>
+            <span style="font-family: 'JetBrains Mono', monospace; color: #f2ebdf">motoko / hermes</span>
+            <span>herdr pane on vps-01 · the attach stream, not a copy</span>
+          </div>
+          <div role="region" aria-label="Hermes terminal" style="flex: 1 1 auto; min-height: 420px; padding: 14px 16px; border-radius: 10px; border: 1px solid #2d2924; background: #0d0b09; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.65; overflow: auto">
+            <sc-for list="{{term}}" as="ln" hint-placeholder-count="10">
+              <div style="color: {{ln.color}}; white-space: pre-wrap">{{ln.text}}</div>
+            </sc-for>
+            <div style="color: #f2ebdf">› <span style="display: inline-block; width: 8px; height: 15px; vertical-align: -2px; background: {{accent}}"></span></div>
+          </div>
+          <div role="group" aria-label="Terminal keys" style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{keys}}" as="k" hint-placeholder-count="8">
+              <button type="button" style="min-width: 44px; min-height: 36px; padding: 0 10px; border-radius: 6px; border: 1px solid #3e3830; background: #211e1a; color: #d8d0c3; font-family: 'JetBrains Mono', monospace; font-size: 12px; cursor: pointer">{{k}}</button>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-radius: 10px; background: #1c1916; border: 1px solid #3e3830">
+            <label style="flex: 1 1 auto; display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 13px">
+              <span style="color: {{accent}}">›</span>
+              <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Terminal input line</span>
+              <input type="text" placeholder="Type into the Hermes terminal…" style="flex: 1 1 auto; min-width: 0; border: 0; background: transparent; color: #f2ebdf; font: inherit; outline: none">
+            </label>
+            <button type="button" aria-label="Dictate (hold)" title="Dictate (hold)" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: #9b9183; cursor: pointer">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0M12 17v5"></path></svg></button>
+            <button type="button" style="min-height: 36px; padding: 0 14px; border-radius: 8px; border: 0; background: {{accent}}; color: #1b1407; font: inherit; font-weight: 600; cursor: pointer">Send</button>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var seed = [
+      { role: 'user', text: 'Morning. What needs me today?' },
+      { role: 'hermes', kind: 'decisions', text: 'Two decisions are waiting on you, both on the ops rig, and one seat is stuck at a permission prompt. Everything else is moving: 5 of 12 seats are working.',
+        tools: [{ cmd: 'rig health', result: '1 finding' }, { cmd: 'attention view', result: '2 requests' }, { cmd: 'rig parked', result: '1 seat' }] },
+      { role: 'user', text: 'Show me vps-02.', spoken: true },
+      { role: 'hermes', kind: 'host', text: 'vps-02 is up and its seats are fine, but the disk is at 88%. ops-disk-0142 is my plan to free about 9 GB. It is waiting for your decision.',
+        tools: [{ cmd: 'ssh vps-02 df -h /', result: '88% used' }] }
+    ];
+    this.state = { mode: 'chat', voice: 'idle', draft: '', pending: false, messages: props.startEmpty ? [] : seed };
+    this.timer = null;
+  }
+  componentWillUnmount() { if (this.timer) clearTimeout(this.timer); }
+  ask(text, spoken) {
+    var self = this;
+    var q = (text || '').trim();
+    if (!q || this.state.pending) return;
+    this.setState({ messages: this.state.messages.concat([{ role: 'user', text: q, spoken: !!spoken }]), draft: '', pending: true });
+    this.timer = setTimeout(function () {
+      var low = q.toLowerCase();
+      var reply = /decid|approv|wait|need/.test(low)
+        ? { role: 'hermes', kind: 'decisions', text: 'Here is what is waiting on you right now.', tools: [{ cmd: 'attention view', result: '2 requests' }] }
+        : /vps|host|disk|health/.test(low)
+        ? { role: 'hermes', kind: 'host', text: 'Latest from vps-02:', tools: [{ cmd: 'ssh vps-02 df -h /', result: '88% used' }] }
+        : { role: 'hermes', text: 'I checked the rigs. The factory rig is mid-wave: orch-lead is coordinating, qa-test is 12 of 18 steps through the staging path, and review-b has no recent screen sample, so I show it as unknown. Nothing here needs a decision from you.', tools: [{ cmd: 'rig capture factory', result: '7 seats' }] };
+      self.setState({ messages: self.state.messages.concat([reply]), pending: false });
+    }, 900);
+  }
+  renderVals() {
+    var self = this;
+    var accent = this.props.accent ?? '#f0a830';
+    var s = this.state;
+    var hasMsgs = s.messages.length > 0;
+    var voiceOn = s.voice === 'voice';
+    var canSend = s.draft.trim().length > 0 && !s.pending;
+    function metric(label, pct) { return { label: label, pct: pct + '%', color: pct >= 85 ? '#ff7b70' : pct >= 75 ? '#f9e2af' : '#93c36b' }; }
+    function L(text, color) { return { text: text, color: color || '#d8d0c3' }; }
+    return {
+      accent: accent,
+      isChat: s.mode === 'chat', isTerminal: s.mode === 'terminal',
+      chatTabBg: s.mode === 'chat' ? '#2a2621' : 'transparent', chatTabFg: s.mode === 'chat' ? '#f2ebdf' : '#9b9183',
+      termTabBg: s.mode === 'terminal' ? '#2a2621' : 'transparent', termTabFg: s.mode === 'terminal' ? '#f2ebdf' : '#9b9183',
+      isVoice: voiceOn, isDictating: s.voice === 'dictating', showComposer: !voiceOn,
+      isEmpty: !hasMsgs,
+      logoSize: voiceOn ? '168px' : hasMsgs && s.mode === 'chat' ? '84px' : '148px',
+      titleSize: hasMsgs && !voiceOn && s.mode === 'chat' ? '18px' : '26px',
+      heroPad: hasMsgs && !voiceOn && s.mode === 'chat' ? '18px 24px 14px' : '44px 24px 28px',
+      statusDot: voiceOn ? accent : s.pending ? '#6cb8d6' : '#93c36b',
+      statusText: voiceOn ? 'Listening' : s.pending ? 'Working' : 'Hermes on vps-01 · connected to the rig daemon',
+      messages: s.messages.map(function (m) {
+        return { text: m.text, spoken: !!m.spoken, isUser: m.role === 'user', isHermes: m.role === 'hermes',
+          tools: m.tools || [], hasTools: !!(m.tools && m.tools.length), hasDecisions: m.kind === 'decisions', hasHost: m.kind === 'host' };
+      }),
+      pending: s.pending,
+      decisions: [
+        { id: 'ops-disk-0142', owner: 'infra-systems@ops', summary: 'Free disk on vps-02 by rotating and compressing rig logs.' },
+        { id: 'ops-release-007', owner: 'release-deploy@ops', summary: 'Deploy the release candidate to staging.' }
+      ],
+      hostMetrics: [metric('CPU', 71), metric('Memory', 79), metric('Disk', 88)],
+      threads: [
+        { title: 'What needs me today?', when: 'Now', bg: 'rgba(240, 168, 48, 0.13)', fg: '#f2ebdf' },
+        { title: 'Restart the research seats', when: 'Yesterday', bg: 'transparent', fg: '#d8d0c3' },
+        { title: 'Grow factory with a second QA seat', when: 'Mon', bg: 'transparent', fg: '#d8d0c3' },
+        { title: 'Why is review-b unknown?', when: 'Mon', bg: 'transparent', fg: '#d8d0c3' }
+      ],
+      chips: ['What needs my decision?', 'How are my VPS hosts?', 'Summarise the factory rig', 'Who is parked?'].map(function (label) {
+        return { label: label, pick: function () { self.ask(label); } };
+      }),
+      bars: [0, 0.15, 0.3, 0.45, 0.3, 0.15, 0].map(function (d) { return { delay: d + 's' }; }),
+      draft: s.draft,
+      sendDisabled: !canSend,
+      sendBg: canSend ? accent : '#2a2621', sendFg: canSend ? '#1b1407' : '#9b9183',
+      micBg: s.voice === 'dictating' ? 'rgba(255, 123, 112, 0.14)' : 'transparent', micFg: s.voice === 'dictating' ? '#ff7b70' : '#9b9183',
+      term: [
+        L('hermes@vps-01:~$ hermes --profile motoko', '#9b9183'),
+        L('Hermes · profile motoko · tools: openrig, ssh, herdr', '#9b9183'),
+        L(''),
+        L('› what needs me today', '#f2ebdf'),
+        L('  ⏺ rig health                      1 finding: vps-02 disk 88%', '#6cb8d6'),
+        L('  ⏺ attention view                  2 requests blocked on you', '#6cb8d6'),
+        L('  ⏺ rig parked                      dev-builder@factory at a prompt', '#6cb8d6'),
+        L(''),
+        L('  Two decisions are waiting, both on the ops rig:'),
+        L('    ops-disk-0142    free disk on vps-02          owner infra-systems@ops'),
+        L('    ops-release-007  deploy RC to staging         owner release-deploy@ops'),
+        L('  dev-builder@factory is at a permission prompt. Answer it in its pane.'),
+        L(''),
+        L('› show me vps-02', '#f2ebdf'),
+        L('  ⏺ ssh vps-02 df -h /             /dev/vda1  80G  70G  10G  88% /', '#6cb8d6'),
+        L('  Disk is the only problem. ops-disk-0142 frees about 9 GB once you approve it.')
+      ],
+      keys: ['Esc', 'Tab', 'Ctrl', '↑', '↓', '←', '→', 'Ctrl-C', '⏎'],
+      toChat: function () { self.setState({ mode: 'chat' }); },
+      toTerminal: function () { self.setState({ mode: 'terminal', voice: 'idle' }); },
+      newChat: function () { self.setState({ messages: [], draft: '', pending: false, mode: 'chat', voice: 'idle' }); },
+      onDraft: function (e) { self.setState({ draft: e.target.value }); },
+      onKey: function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); self.ask(self.state.draft); } },
+      send: function () { self.ask(self.state.draft); },
+      dictate: function () { self.setState({ voice: self.state.voice === 'dictating' ? 'idle' : 'dictating' }); },
+      cancelDictation: function () { self.setState({ voice: 'idle' }); },
+      insertDictation: function () { var d = self.state.draft; self.setState({ voice: 'idle', draft: (d ? d + ' ' : '') + 'how is the factory rig doing' }); },
+      startVoice: function () { self.setState({ voice: 'voice', mode: 'chat' }); },
+      endVoice: function () { self.setState({ voice: 'idle' }); self.ask('Is anything waiting for me on the ops rig?', true); }
+    };
+  }
+}
+</script>
+</body>
+</html>

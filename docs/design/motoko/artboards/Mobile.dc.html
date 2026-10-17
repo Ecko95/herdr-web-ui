@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Motoko on phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#12100e}
+a{color:#f0a830}a:hover{color:#f6bb55}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #12100e; color: #d8d0c3; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden">
+
+  <header style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #181613; border-bottom: 1px solid #2d2924">
+    <span style="font-family: 'JetBrains Mono', monospace; color: #9b9183; font-size: 13px">herdr /</span>
+    <span style="font-size: 17px; font-weight: 600; color: #f2ebdf">Motoko</span>
+    <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9b9183"><img src="../hermes-logo-white.svg" alt="" style="width: 16px; height: 16px; object-fit: contain"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>Hermes</span>
+  </header>
+
+  <div style="flex: 1 1 auto; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 16px">
+
+    <a href="Workflow.dc.html" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 12px; background: #211e1a; border: 1px solid {{accent}}; color: #d8d0c3; text-decoration: none">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">ops-disk-0142</span>
+        <span style="padding: 1px 8px; border-radius: 999px; font-size: 11px; background: rgba(240, 168, 48, 0.13); color: {{accent}}">Blocked on you</span>
+        <span style="margin-left: auto; font-size: 11px; color: #9b9183">+1 more</span>
+      </div>
+      <div style="color: #f2ebdf; font-weight: 500">Free disk on vps-02: rotate and compress rig logs</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #9b9183"><span style="font-family: 'JetBrains Mono', monospace">infra-systems@ops</span><span style="color: {{accent}}; font-weight: 600">Decide</span></div>
+    </a>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; color: #9b9183; text-transform: uppercase; letter-spacing: 0.06em">VPS health</h2>
+      <sc-for list="{{hosts}}" as="h" hint-placeholder-count="2">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: #181613; border: 1px solid #2d2924">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: {{h.color}}"></span>
+            <span style="font-family: 'JetBrains Mono', monospace; color: #f2ebdf">{{h.name}}</span>
+            <span style="margin-left: auto; font-size: 12px; color: {{h.color}}">{{h.state}}</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-size: 12px">
+            <sc-for list="{{h.metrics}}" as="m" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <span style="color: #9b9183">{{m.label}} <span style="font-family: 'JetBrains Mono', monospace; color: #d8d0c3">{{m.pct}}</span></span>
+                <div style="height: 5px; border-radius: 999px; background: #2a2621; overflow: hidden"><div style="height: 5px; width: {{m.pct}}; background: {{m.color}}"></div></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; color: #9b9183; text-transform: uppercase; letter-spacing: 0.06em">OpenRig rigs</h2>
+      <div style="border-radius: 12px; background: #181613; border: 1px solid #2d2924; overflow: hidden">
+        <sc-for list="{{rigs}}" as="r" hint-placeholder-count="3">
+          <a href="Rig.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; border-bottom: 1px solid #2d2924; color: #d8d0c3; text-decoration: none">
+            <span style="font-family: 'JetBrains Mono', monospace; color: #f2ebdf; width: 76px">{{r.rig}}</span>
+            <span style="font-size: 12px; color: #9b9183">{{r.owner}}</span>
+            <span style="margin-left: auto; padding: 1px 8px; border-radius: 999px; font-size: 11px; background: {{r.tint}}; color: {{r.color}}">{{r.status}}</span>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+
+  <nav aria-label="Motoko" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid #2d2924; background: #181613">
+    <a href="#" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 60px; font-size: 11px; color: {{accent}}; text-decoration: none">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Overview</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 60px; font-size: 11px; color: #9b9183; text-decoration: none">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>Attention</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 60px; font-size: 11px; color: #9b9183; text-decoration: none">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"></circle><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="19" r="2.5"></circle><path d="M12 7.5v4M12 11.5l-5.5 5M12 11.5l5.5 5"></path></svg>Rigs</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 60px; font-size: 11px; color: #9b9183; text-decoration: none">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6M8 13h8M8 17h5"></path></svg>Audit</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var C = { blocked: '#ff7b70', done: '#93c36b', warn: '#f9e2af' };
+    function metric(label, pct) {
+      return { label: label, pct: pct + '%', color: pct >= 85 ? C.blocked : pct >= 75 ? C.warn : C.done };
+    }
+    return {
+      accent: this.props.accent ?? '#f0a830',
+      hosts: [
+        { name: 'vps-01', state: 'Healthy', color: C.done, metrics: [metric('CPU', 34), metric('Mem', 58), metric('Disk', 47)] },
+        { name: 'vps-02', state: 'Disk warning', color: C.warn, metrics: [metric('CPU', 71), metric('Mem', 79), metric('Disk', 88)] }
+      ],
+      rigs: [
+        { rig: 'kernel', owner: '1/2 working', status: 'All seats up', color: C.done, tint: 'rgba(147, 195, 107, 0.14)' },
+        { rig: 'factory', owner: '3/7 working', status: '1 needs-input', color: C.blocked, tint: 'rgba(255, 123, 112, 0.14)' },
+        { rig: 'ops', owner: '1/3 working', status: '2 blocked on you', color: '#f0a830', tint: 'rgba(240, 168, 48, 0.13)' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
