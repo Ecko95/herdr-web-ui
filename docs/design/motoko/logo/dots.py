@@ -1,4 +1,5 @@
-import sys
+import sys, os
+ALPHA = bool(os.environ.get('ALPHA'))
 import numpy as np
 from PIL import Image, ImageDraw
 D = sys.argv[1]; N = int(sys.argv[2]); CELL = int(sys.argv[3])
@@ -38,7 +39,7 @@ def render(name, style):
     v = np.where(is_hair, v_hair, np.clip((lum - 0.2) / 0.6, 0, 1)) * np.clip(cov * 1.4, 0, 1)
     v = np.where(pink > 0.12, 1, v)
     SS = 4; W = N * CELL * SS
-    img = Image.new('RGB', (W, W), BG); d = ImageDraw.Draw(img)
+    img = Image.new('RGBA', (W, W), (0, 0, 0, 0)) if ALPHA else Image.new('RGB', (W, W), BG); d = ImageDraw.Draw(img)
     for j in range(N):
         for i in range(N):
             if cov[j, i] < 0.25: continue
@@ -59,6 +60,6 @@ seq = [('open', 3000), ('half', 70), ('closed', 120), ('half', 70), ('open', 420
        ('half', 60), ('closed', 90), ('half', 60), ('open', 260), ('half', 60), ('closed', 90), ('half', 60)]
 imgs = [frames[n] for n, _ in seq]; durs = [t for _, t in seq]
 out = sys.argv[5]
-imgs[0].save(out + '.gif', save_all=True, append_images=imgs[1:], duration=durs, loop=0, optimize=True)
-imgs[0].save(out + '.webp', save_all=True, append_images=imgs[1:], duration=durs, loop=0, quality=90, method=6)
+if not ALPHA: imgs[0].save(out + '.gif', save_all=True, append_images=imgs[1:], duration=durs, loop=0, optimize=True)
+imgs[0].save(out + '.webp', save_all=True, append_images=imgs[1:], duration=durs, loop=0, quality=90, method=6, **({'lossless': False, 'alpha_quality': 90} if ALPHA else {}))
 frames['open'].save(out + '-open.png'); frames['closed'].save(out + '-closed.png')

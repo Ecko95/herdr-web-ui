@@ -29,16 +29,16 @@ dot-matrix image) that blinks every few seconds, with an occasional double blink
 
 | File | Use |
 | --- | --- |
-| `logo/motoko-mono.webp` | Default hero on Ask Motoko: warm white dots, pink irises |
-| `logo/motoko-color.webp` | Colour variant (the artboard's `logoStyle` tweak) |
+| `logo/motoko-mono-full.webp` | Default boot-screen portrait on Ask Motoko: warm white dots, pink irises, transparent background, 896 px |
+| `logo/motoko-color-full.webp` | Colour variant (the artboard's `logoStyle` tweak), transparent, 896 px |
 | `logo/motoko-face-color.webp` | Face close-up for small places: chat avatar, header status |
 | `logo/motoko-source.webp` | The source portrait |
 | `logo/blink.py`, `logo/dots.py` | Regenerate them (Python 3 with Pillow and NumPy): `blink.py` paints the half-closed and closed eye frames, `dots.py` turns each frame into the dot grid and writes the animation |
 
 ```sh
 python3 blink.py motoko-source.webp .                 # open.png, half.png, closed.png
-python3 dots.py . 112 4 mono motoko-mono              # 112×112 dots, 4 px each
-python3 dots.py . 96 5 color motoko-color
+ALPHA=1 python3 dots.py . 112 8 mono motoko-mono-full     # 112×112 dots, 8 px each, transparent
+ALPHA=1 python3 dots.py . 112 8 color motoko-color-full
 python3 dots.py . 28 4 color motoko-face-color 300,330,860,890   # face crop
 ```
 
@@ -65,8 +65,21 @@ logo supplied by the owner; Motoko's mark replaced it in the artboards.
 - Operations workflow: Detect › Plan › Decide › Claim › Proof › Close, with the current item.
 
 **Ask Motoko (`Ask`)**
-- Motoko's blinking dot-matrix mark centred above the conversation, in a ring; it shrinks once
-  the conversation starts and grows in voice mode.
+- **Boot screen first.** The page opens on a full-height screen styled like an old terminal (the
+  design uses a fixed 848 px; the real page uses the viewport, `100dvh` minus the top bar):
+  - a prompt line (`motoko@vps-01:~$ hermes --profile motoko`);
+  - Motoko's portrait, frameless and as tall as the screen allows, revealed top to bottom in 28
+    steps over 1.6 s, then blinking;
+  - beside it, behind a vertical rule, boot lines printed one by one (about 0.11 s apart): version,
+    profile, host and rig daemon, rigs, seat activity, host warnings, decisions waiting, date,
+    recent conversations and the slash commands; then a blinking block cursor;
+  - a notice between two accent rules for the most urgent decision;
+  - "Scroll down to ask Motoko" with a bobbing chevron, linking to the chat below;
+  - faint scanlines that flicker once and settle; a Replay boot button.
+  With reduced motion everything is shown at once (no reveal, typing, cursor blink or flicker)
+  and the portrait is a still frame. In voice mode the portrait glows in the accent colour.
+- **Then the conversation.** Scrolling down reaches the conversations list and the chat; the
+  message box stays pinned to the bottom of the screen while the conversation scrolls.
 - Chat / Terminal switch, like herdr's own pane views. Terminal is the herdr pane where Hermes
   runs, with the existing key bar and terminal input line.
 - Chat replies show the checks Hermes ran, then the answer, then optional cards (decisions with
