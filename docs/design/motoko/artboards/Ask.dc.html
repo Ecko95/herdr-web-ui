@@ -52,8 +52,8 @@ a{color:#f0a830}a:hover{color:#f6bb55}
       </div>
 
       <div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 28px 40px">
-        <div style="flex: 0 1 620px; min-width: 260px; aspect-ratio: 1 / 1; filter: {{glow}}">
-          <img src="{{logoSrc}}" alt="Motoko, a dot-matrix portrait that blinks" style="display: block; width: 100%; height: 100%; animation: motoko-scan 1.6s steps(28, end) 0.35s both">
+        <div style="flex: 0 1 auto; min-width: 260px; max-width: 100%; display: flex; justify-content: center; filter: {{glow}}">
+          <img src="{{logoSrc}}" alt="{{poseAlt}}" style="display: block; width: auto; height: auto; max-width: min(100%, 760px); max-height: 620px; animation: motoko-scan 1.6s steps(28, end) 0.35s both">
         </div>
         <div style="flex: 1 1 340px; max-width: 520px; box-sizing: border-box; padding-left: 22px; border-left: 1px solid #3e3830; display: flex; flex-direction: column">
           <sc-for list="{{bootLines}}" as="bl" hint-placeholder-count="15">
@@ -291,17 +291,19 @@ a{color:#f0a830}a:hover{color:#f6bb55}
       <div style="position: absolute; top: 14px; right: 16px; left: 16px; display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">
         <span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>motoko · Hermes Agent</span>
         <span style="flex: 1 1 auto"></span>
-        <a href="../logo/motoko-wine.webp" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; text-decoration: none; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px">
+        <a href="{{viewerSrc}}" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; text-decoration: none; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>Open in new window</a>
+        <button type="button" onClick="{{nextPose}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; cursor: pointer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>Next pose</button>
         <button type="button" onClick="{{closeViewer}}" aria-label="Close" title="Close" style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; cursor: pointer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
-      <img src="../logo/motoko-wine.webp" alt="Motoko, smiling with a glass of white wine" style="display: block; max-width: min(1400px, 100%); max-height: min(860px, 100%); width: auto; height: auto; object-fit: contain">
+      <img src="{{viewerSrc}}" alt="{{viewerAlt}}" style="display: block; max-width: min(1400px, 100%); max-height: min(860px, 100%); width: auto; height: auto; object-fit: contain; animation: motoko-scan 1.2s steps(24, end) both">
     </div>
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"logoStyle":{"editor":"enum","options":["dots","color"],"default":"dots"},"$preview":{"width":1440,"height":1100}}'>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"logoStyle":{"editor":"enum","options":["color","dots"],"default":"color"},"$preview":{"width":1440,"height":1100}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -313,10 +315,10 @@ class Component extends DCLogic {
       { role: 'hermes', kind: 'host', text: 'vps-02 is up and its seats are fine, but the disk is at 88%. ops-disk-0142 is my plan to free about 9 GB. It is waiting for your decision.',
         tools: [{ cmd: 'ssh vps-02 df -h /', result: '88% used' }] }
     ];
-    this.state = { mode: 'chat', voice: 'idle', draft: '', pending: false, boot: true, viewer: false, messages: props.startEmpty ? [] : seed };
+    this.state = { mode: 'chat', voice: 'idle', draft: '', pending: false, boot: true, viewer: false, viewerPose: 0, pose: Math.floor(Math.random() * 5), messages: props.startEmpty ? [] : seed };
     this.timer = null;
   }
-  componentWillUnmount() { if (this.timer) clearTimeout(this.timer); if (this.bootTimer) clearTimeout(this.bootTimer); }
+  componentWillUnmount() { if (this.timer) clearTimeout(this.timer); if (this.bootTimer) clearTimeout(this.bootTimer); if (this.viewerTimer) clearTimeout(this.viewerTimer); }
   ask(text, spoken) {
     var self = this;
     var q = (text || '').trim();
@@ -341,6 +343,14 @@ class Component extends DCLogic {
     var canSend = s.draft.trim().length > 0 && !s.pending;
     function metric(label, pct) { return { label: label, pct: pct + '%', color: pct >= 85 ? '#ff7b70' : pct >= 75 ? '#f9e2af' : '#93c36b' }; }
     function L(text, color) { return { text: text, color: color || '#d8d0c3' }; }
+    // the boot screen shows one pose at random on each load and a different one on Replay boot
+    var POSES = [
+      { color: '../logo/motoko-color-full.webp', dots: '../logo/motoko-mono-full.webp', alt: 'Motoko in dot art, smiling, blinking now and then' },
+      { color: '../logo/poses/motoko-wine-color.webp', dots: '../logo/poses/motoko-wine-mono.webp', alt: 'Motoko in dot art, holding a glass of white wine' },
+      { color: '../logo/poses/motoko-glance-color.webp', dots: '../logo/poses/motoko-glance-mono.webp', alt: 'Motoko in dot art, glancing sideways' },
+      { color: '../logo/poses/motoko-shrug-color.webp', dots: '../logo/poses/motoko-shrug-mono.webp', alt: 'Motoko in dot art, shrugging in a work suit with red mechanical arms' },
+      { color: '../logo/poses/motoko-visor-color.webp', dots: '../logo/poses/motoko-visor-mono.webp', alt: 'Motoko in dot art, wearing a visor and tapping her temple' }
+    ];
     var W = '#f2ebdf', D = '#9b9183';
     var rows = [
       { value: 'Motoko', suffix: ' v0.1 · Hermes Agent', color: W, weight: 600 },
@@ -365,7 +375,10 @@ class Component extends DCLogic {
       at: function (k) { return (t0 + rows.length * step + 0.15 + k * 0.35).toFixed(2) + 's'; }
     };
     return {
-      viewerOpen: !!(this.state && this.state.viewer), openViewer: function () { self.setState({ viewer: true }); }, closeViewer: function () { self.setState({ viewer: false }); },
+      viewerOpen: s.viewer, viewerSrc: POSES[s.viewerPose].color, viewerAlt: POSES[s.viewerPose].alt,
+      openViewer: function () { self.setState({ viewer: true, viewerPose: Math.floor(Math.random() * 5) }); },
+      nextPose: function () { var n = (self.state.viewerPose + 1 + Math.floor(Math.random() * 4)) % 5; self.setState({ viewer: false }); self.viewerTimer = setTimeout(function () { self.setState({ viewer: true, viewerPose: n }); }, 30); },
+      closeViewer: function () { self.setState({ viewer: false }); },
       accent: accent,
       isChat: s.mode === 'chat', isTerminal: s.mode === 'terminal',
       chatTabBg: s.mode === 'chat' ? '#2a2621' : 'transparent', chatTabFg: s.mode === 'chat' ? '#f2ebdf' : '#9b9183',
@@ -373,11 +386,12 @@ class Component extends DCLogic {
       isVoice: voiceOn, isDictating: s.voice === 'dictating', showComposer: !voiceOn,
       isEmpty: !hasMsgs,
       logoSize: voiceOn ? '208px' : hasMsgs && s.mode === 'chat' ? '96px' : '184px',
-      logoSrc: (this.props.logoStyle ?? 'dots') === 'color' ? '../logo/motoko-color-full.webp' : '../logo/motoko-mono-full.webp',
+      logoSrc: (this.props.logoStyle ?? 'color') === 'dots' ? POSES[s.pose].dots : POSES[s.pose].color,
+      poseAlt: POSES[s.pose].alt,
       boot: s.boot,
       glow: voiceOn ? 'drop-shadow(0 0 22px rgba(240, 168, 48, 0.35))' : 'none',
       bootLines: boot.lines, cursorDelay: boot.at(0), noticeDelay: boot.at(1), hintDelay: boot.at(2),
-      replay: function () { self.setState({ boot: false }); self.bootTimer = setTimeout(function () { self.setState({ boot: true }); }, 60); },
+      replay: function () { self.setState({ boot: false, pose: (self.state.pose + 1 + Math.floor(Math.random() * 4)) % 5 }); self.bootTimer = setTimeout(function () { self.setState({ boot: true }); }, 60); },
       titleSize: hasMsgs && !voiceOn && s.mode === 'chat' ? '18px' : '26px',
       heroPad: hasMsgs && !voiceOn && s.mode === 'chat' ? '18px 24px 14px' : '44px 24px 28px',
       statusDot: voiceOn ? accent : s.pending ? '#6cb8d6' : '#93c36b',

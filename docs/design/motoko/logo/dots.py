@@ -56,8 +56,8 @@ def render(name, style):
                 c = PINK if pink[j, i] > 0.12 else INK
             else:
                 if lum[j, i] < 0.1: continue
-                c = tuple(int(min(255, x * 255 * 1.08)) for x in col[j, i])
-                r = CELL * SS * (0.2 + 0.24 * min(1, lum[j, i] * 1.15))
+                c = tuple(int(min(255, x * 255 * 1.18)) for x in col[j, i])
+                r = CELL * SS * (0.25 + 0.21 * min(1, lum[j, i] * 1.15))
             d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
     return img.resize((N * CELL, N * CELL), Image.LANCZOS)
 style = sys.argv[4]

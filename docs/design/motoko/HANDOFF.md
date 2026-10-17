@@ -29,8 +29,10 @@ dot-matrix image) that blinks every few seconds, with an occasional double blink
 
 | File | Use |
 | --- | --- |
-| `logo/motoko-mono-full.webp` | Default boot-screen portrait on Ask Motoko: warm white dots, pink irises, transparent background, 200×200 dots, 1000 px |
-| `logo/motoko-color-full.webp` | Colour variant (the artboard's `logoStyle` tweak), transparent, 200×200 dots, 1000 px |
+| `logo/motoko-color-full.webp` | Pose 1, the blinking portrait, in colour (the default): transparent, 200×200 dots, 1000 px |
+| `logo/motoko-mono-full.webp` | Pose 1 in warm white dots with pink irises (the artboard's `logoStyle: dots` tweak) |
+| `logo/poses/motoko-{wine,glance,shrug,visor}-{color,mono}.webp` | Poses 2–5, still dot art in colour and mono, transparent, 200 dots on the long side (wine: 260) |
+| `logo/poses/motoko-*-source.webp` | The source image of each pose |
 | `logo/motoko-face-color.webp` | Face close-up for small places: chat avatar, header status |
 | `logo/motoko-wine.webp` | Full-size Motoko (transparent) shown when the face close-up is clicked |
 | `logo/motoko-source.webp` | The source portrait |
@@ -41,14 +43,21 @@ python3 blink.py motoko-source.webp .                 # open.png, half.png, clos
 ALPHA=1 python3 dots.py . 200 5 mono motoko-mono-full     # 200×200 dots, 5 px each, transparent
 ALPHA=1 python3 dots.py . 200 5 color motoko-color-full
 python3 dots.py . 28 4 color motoko-face-color 300,330,860,890   # face crop
+python3 pose.py poses/motoko-visor-source.webp poses/motoko-visor 200   # a still pose, both styles
 ```
 
 The eye positions in `blink.py` are fitted to this portrait; a new source image needs new ones.
+**Random poses.** The boot screen shows one of the five poses at random on each load; Replay boot
+always switches to a different one. Each pose keeps its own proportions (tall full-body poses up
+to 620 px high, the wide wine pose up to 760 px wide).
+
 **Full-size viewer.** Every face close-up (chat avatars on Ask, the Hermes status in the
-Overview and phone top bars) is a button, "View Motoko full size", with a zoom-in cursor. It opens
-a full-screen viewer on a dark backdrop showing `motoko-wine.webp`, with "Open in new window"
-(opens the image in a new tab) and Close. Reuse `src/components/ImageLightbox.tsx` for the viewer,
-so Escape, focus return and the phone layout come for free.
+Overview and phone top bars) is a button, "View Motoko full size", with a zoom-in cursor. On Ask
+it opens a full-screen viewer with a random colour dot-art pose that scans in like the boot
+screen, plus a Next pose button; the Overview and phone open `motoko-wine.webp`. The viewer
+has "Open in new window" (opens the pose shown in a new tab) and Close. Reuse
+`src/components/ImageLightbox.tsx` for the viewer, so Escape, focus return and the phone layout
+come for free.
 
 In the real client, respect `prefers-reduced-motion` by showing a still frame (the scripts also
 write `*-open.png`).
