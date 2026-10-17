@@ -9,7 +9,7 @@
 <x-dc>
 <helmet>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+Symbols+2&amp;display=swap">
 <style>
 body{margin:0;background:#12100e}
 a{color:#f0a830}a:hover{color:#f6bb55}
@@ -53,7 +53,19 @@ a{color:#f0a830}a:hover{color:#f6bb55}
 
       <div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 28px 40px">
         <div style="flex: 0 1 auto; min-width: 260px; max-width: 100%; display: flex; justify-content: center; filter: {{glow}}">
-          <img src="{{logoSrc}}" alt="{{poseAlt}}" style="display: block; width: auto; height: auto; max-width: min(100%, 760px); max-height: 620px; animation: motoko-scan 1.6s steps(28, end) 0.35s both">
+          <sc-if value="{{artReady}}" hint-placeholder-val="{{ true }}">
+            <div role="img" aria-label="{{poseAlt}}" style="font-family: 'Noto Sans Symbols 2', 'DejaVu Sans Mono', monospace; font-size: {{artFont}}; line-height: 1; letter-spacing: 0; font-variant-ligatures: none">
+              <sc-for list="{{artLines}}" as="ln" hint-placeholder-count="60">
+                <div style="height: 1em; white-space: pre; animation: motoko-in 0s steps(1, end) {{ln.delay}} both"><sc-for list="{{ln.runs}}" as="r" hint-placeholder-count="20"><span style="color: {{r.color}}">{{r.text}}</span></sc-for></div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{artLoading}}" hint-placeholder-val="{{ false }}">
+            <div style="min-height: 620px; display: flex; align-items: center; color: #9b9183">loading portrait…</div>
+          </sc-if>
+          <sc-if value="{{artFailed}}" hint-placeholder-val="{{ false }}">
+            <img src="{{logoSrc}}" alt="{{poseAlt}}" style="display: block; width: auto; height: auto; max-width: min(100%, 760px); max-height: 620px; animation: motoko-scan 1.6s steps(28, end) 0.35s both">
+          </sc-if>
         </div>
         <div style="flex: 1 1 340px; max-width: 520px; box-sizing: border-box; padding-left: 22px; border-left: 1px solid #3e3830; display: flex; flex-direction: column">
           <sc-for list="{{bootLines}}" as="bl" hint-placeholder-count="15">
@@ -315,10 +327,31 @@ class Component extends DCLogic {
       { role: 'hermes', kind: 'host', text: 'vps-02 is up and its seats are fine, but the disk is at 88%. ops-disk-0142 is my plan to free about 9 GB. It is waiting for your decision.',
         tools: [{ cmd: 'ssh vps-02 df -h /', result: '88% used' }] }
     ];
-    this.state = { mode: 'chat', voice: 'idle', draft: '', pending: false, boot: true, viewer: false, viewerPose: 0, pose: Math.floor(Math.random() * 5), messages: props.startEmpty ? [] : seed };
+    this.state = { mode: 'chat', voice: 'idle', draft: '', pending: false, boot: true, viewer: false, viewerPose: 0, art: null, artFailed: false, frame: 'open', pose: Math.floor(Math.random() * 5), messages: props.startEmpty ? [] : seed };
     this.timer = null;
   }
-  componentWillUnmount() { if (this.timer) clearTimeout(this.timer); if (this.bootTimer) clearTimeout(this.bootTimer); if (this.viewerTimer) clearTimeout(this.viewerTimer); }
+  componentDidMount() {
+    var self = this;
+    // the boot portraits are coloured Braille text (2x4 dots per character), one JSON for all poses
+    fetch('../logo/motoko-braille.json').then(function (r) { return r.json(); })
+      .then(function (d) { self.setState({ art: d }); })
+      .catch(function () { self.setState({ artFailed: true }); });
+    var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!still) this.scheduleBlink();
+  }
+  // blink after a random 1.6 to 2.6 s pause: half, closed, half, open
+  scheduleBlink() {
+    var self = this;
+    this.blinkTimer = setTimeout(function () {
+      var seq = [['half', 70], ['closed', 110], ['half', 70], ['open', 0]], k = 0;
+      (function step() {
+        self.setState({ frame: seq[k][0] });
+        var wait = seq[k][1]; k++;
+        if (k < seq.length) self.blinkTimer = setTimeout(step, wait); else self.scheduleBlink();
+      })();
+    }, 1600 + Math.random() * 1000);
+  }
+  componentWillUnmount() { if (this.blinkTimer) clearTimeout(this.blinkTimer); if (this.timer) clearTimeout(this.timer); if (this.bootTimer) clearTimeout(this.bootTimer); if (this.viewerTimer) clearTimeout(this.viewerTimer); }
   ask(text, spoken) {
     var self = this;
     var q = (text || '').trim();
@@ -351,6 +384,25 @@ class Component extends DCLogic {
       { color: '../logo/poses/motoko-shrug-color.webp', dots: '../logo/poses/motoko-shrug-mono.webp', alt: 'Motoko in dot art, shrugging in a work suit with red mechanical arms' },
       { color: '../logo/poses/motoko-visor-color.webp', dots: '../logo/poses/motoko-visor-mono.webp', alt: 'Motoko in dot art, wearing a visor and tapping her temple' }
     ];
+    var art = null;
+    if (s.art) {
+      var ap = s.art.poses[s.pose], fr = ap.frames[s.frame] || ap.frames.open, mono = (this.props.logoStyle ?? 'color') === 'dots';
+      var pinkAt = ap.palette.length - 1;
+      art = {
+        // fit 620 px high and 760 px wide on a desktop; shrink with the viewport on a phone
+        font: 'min(' + Math.min(620 / ap.lines, 760 / (ap.cols * 0.7)).toFixed(2) + 'px, ' + (88 / (ap.cols * 0.7)).toFixed(2) + 'vw)',
+        lines: fr.text.map(function (row, i) {
+          var chars = Array.from(row), k = 0;
+          return {
+            delay: (0.3 + i * 0.024).toFixed(3) + 's',
+            runs: fr.runs[i].map(function (r) {
+              var t = chars.slice(k, k + r[0]).join(''); k += r[0];
+              return { text: t, color: mono && r[1] !== pinkAt ? '#f2ebdf' : ap.palette[r[1]] };
+            })
+          };
+        })
+      };
+    }
     var W = '#f2ebdf', D = '#9b9183';
     var rows = [
       { value: 'Motoko', suffix: ' v0.1 · Hermes Agent', color: W, weight: 600 },
@@ -388,6 +440,8 @@ class Component extends DCLogic {
       logoSize: voiceOn ? '208px' : hasMsgs && s.mode === 'chat' ? '96px' : '184px',
       logoSrc: (this.props.logoStyle ?? 'color') === 'dots' ? POSES[s.pose].dots : POSES[s.pose].color,
       poseAlt: POSES[s.pose].alt,
+      artReady: !!art, artLoading: !art && !s.artFailed, artFailed: !art && s.artFailed,
+      artLines: art ? art.lines : [], artFont: art ? art.font : '10px',
       boot: s.boot,
       glow: voiceOn ? 'drop-shadow(0 0 22px rgba(240, 168, 48, 0.35))' : 'none',
       bootLines: boot.lines, cursorDelay: boot.at(0), noticeDelay: boot.at(1), hintDelay: boot.at(2),

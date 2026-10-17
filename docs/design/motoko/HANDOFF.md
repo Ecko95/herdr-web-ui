@@ -47,6 +47,27 @@ python3 pose.py poses/motoko-visor-source.webp poses/motoko-visor 200   # a stil
 ```
 
 The eye positions in `blink.py` are fitted to this portrait; a new source image needs new ones.
+**Braille text portraits (current boot screen).** The boot-screen portrait is not an image: it is
+coloured Unicode Braille text, as in [utpalsinghdev/pi-custom-header](https://github.com/utpalsinghdev/pi-extensions/tree/main/packages/pi-custom-header)
+(MIT), the Pi header this design follows. Each character is a 2×4 dot cell (U+2800–U+28FF); runs
+of characters share a colour from a 28-colour palette per pose, the last entry reserved for the
+pink irises. `logo/motoko-braille.json` holds all five poses (`cols`, `lines`, `palette`, and
+`frames.open|half|closed` each with `text` lines and `runs` of `[length, paletteIndex]`); only the
+first pose has blink frames. `logo/braille.py` builds it from the pose images and the blink frames.
+
+- Font: Noto Sans Symbols 2 (Google Fonts) for its Braille block: every pattern is 0.70 em wide
+  and the dot rows are 0.25 em apart, so `line-height: 1` keeps the dots evenly spaced. Bundle a
+  font with Braille in the real client rather than relying on the system font; fallbacks with a
+  different Braille width break the columns.
+- Size: fit 620 px high and 760 px wide on a desktop, shrinking with the viewport on a phone
+  (`min(<px>, <vw>)`).
+- Loading: lines print one by one, about 24 ms apart, like a terminal.
+- Blink: after a random 1.6–2.6 s pause, half (70 ms), closed (110 ms), half (70 ms), open, then
+  wait again. No blink with reduced motion.
+- `logoStyle: dots` renders every run in warm white except the irises.
+- The dot images below stay as the fallback if the JSON fails to load, and in the viewer.
+- The same text could print in Hermes's own terminal pane, since it is plain text.
+
 **Random poses.** The boot screen shows one of the five poses at random on each load; Replay boot
 always switches to a different one. Each pose keeps its own proportions (tall full-body poses up
 to 620 px high, the wide wine pose up to 760 px wide).
