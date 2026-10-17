@@ -70,8 +70,8 @@ a{color:#f0a830}a:hover{color:#f6bb55}
             <span aria-hidden="true" style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid {{accent}}; animation: motoko-ring 2.4s ease-out infinite"></span>
             <span aria-hidden="true" style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid {{accent}}; animation: motoko-ring 2.4s ease-out 1.2s infinite"></span>
           </sc-if>
-          <div style="position: relative; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%; background: #181613; border: 2px solid {{accent}}; display: flex; align-items: center; justify-content: center">
-            <img src="../hermes-logo-white.svg" alt="Hermes Agent" style="width: 60%; height: 60%; object-fit: contain">
+          <div style="position: relative; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%; background: #181613; border: 2px solid {{accent}}; overflow: hidden">
+            <img src="{{logoSrc}}" alt="Motoko" style="display: block; width: 100%; height: 100%; object-fit: cover; object-position: 46% 30%">
           </div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center">
@@ -104,7 +104,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
                   </sc-if>
                   <sc-if value="{{m.isHermes}}" hint-placeholder-val="{{ true }}">
                     <div style="display: flex; gap: 12px; align-items: flex-start">
-                      <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; align-items: center; justify-content: center"><img src="../hermes-logo-white.svg" alt="" style="width: 18px; height: 18px; object-fit: contain"></span>
+                      <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; overflow: hidden"><img src="../logo/motoko-face-color.webp" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover"></span>
                       <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px">
                         <sc-if value="{{m.hasTools}}" hint-placeholder-val="{{ false }}">
                           <div style="display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: 8px; background: #181613; border: 1px solid #2d2924; font-family: 'JetBrains Mono', monospace; font-size: 12px">
@@ -155,7 +155,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
 
               <sc-if value="{{pending}}" hint-placeholder-val="{{ false }}">
                 <div style="display: flex; gap: 12px; align-items: center; color: #9b9183; font-size: 13px">
-                  <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; align-items: center; justify-content: center"><img src="../hermes-logo-white.svg" alt="" style="width: 18px; height: 18px; object-fit: contain"></span>
+                  <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; overflow: hidden"><img src="../logo/motoko-face-color.webp" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover"></span>
                   Motoko is checking the rigs…
                 </div>
               </sc-if>
@@ -267,7 +267,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1100}}'>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"logoStyle":{"editor":"enum","options":["dots","color"],"default":"dots"},"$preview":{"width":1440,"height":1100}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -314,7 +314,8 @@ class Component extends DCLogic {
       termTabBg: s.mode === 'terminal' ? '#2a2621' : 'transparent', termTabFg: s.mode === 'terminal' ? '#f2ebdf' : '#9b9183',
       isVoice: voiceOn, isDictating: s.voice === 'dictating', showComposer: !voiceOn,
       isEmpty: !hasMsgs,
-      logoSize: voiceOn ? '168px' : hasMsgs && s.mode === 'chat' ? '84px' : '148px',
+      logoSize: voiceOn ? '208px' : hasMsgs && s.mode === 'chat' ? '96px' : '184px',
+      logoSrc: (this.props.logoStyle ?? 'dots') === 'color' ? '../logo/motoko-color.webp' : '../logo/motoko-mono.webp',
       titleSize: hasMsgs && !voiceOn && s.mode === 'chat' ? '18px' : '26px',
       heroPad: hasMsgs && !voiceOn && s.mode === 'chat' ? '18px 24px 14px' : '44px 24px 28px',
       statusDot: voiceOn ? accent : s.pending ? '#6cb8d6' : '#93c36b',

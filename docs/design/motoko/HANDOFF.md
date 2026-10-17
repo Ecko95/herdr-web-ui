@@ -19,13 +19,35 @@ and their sizes.
 | Artboard | Screen | Notes |
 | --- | --- | --- |
 | `Main.dc.html` | Motoko overview, desktop | Hosts, rigs, attention, operations workflow, activity |
-| `Ask.dc.html` | Ask Motoko | Hermes logo, chat, Chat/Terminal switch, dictation, hands-free voice |
+| `Ask.dc.html` | Ask Motoko | Motoko's blinking mark, chat, Chat/Terminal switch, dictation, hands-free voice |
 | `Rig.dc.html` | Rig explorer | Modelled on `rig tui`: hosts › rigs › pods › seats, table/health/topology tabs, a seat's pane |
 | `Workflow.dc.html` | One operation | A Hermes queue item from decision to proof to done |
 | `Mobile.dc.html` | Overview on a phone | 390 px |
 
+**Motoko's mark** is in `logo/`: an animated dot-matrix portrait (in the style of a terminal
+dot-matrix image) that blinks every few seconds, with an occasional double blink.
+
+| File | Use |
+| --- | --- |
+| `logo/motoko-mono.webp` | Default hero on Ask Motoko: warm white dots, pink irises |
+| `logo/motoko-color.webp` | Colour variant (the artboard's `logoStyle` tweak) |
+| `logo/motoko-face-color.webp` | Face close-up for small places: chat avatar, header status |
+| `logo/motoko-source.webp` | The source portrait |
+| `logo/blink.py`, `logo/dots.py` | Regenerate them (Python 3 with Pillow and NumPy): `blink.py` paints the half-closed and closed eye frames, `dots.py` turns each frame into the dot grid and writes the animation |
+
+```sh
+python3 blink.py motoko-source.webp .                 # open.png, half.png, closed.png
+python3 dots.py . 112 4 mono motoko-mono              # 112×112 dots, 4 px each
+python3 dots.py . 96 5 color motoko-color
+python3 dots.py . 28 4 color motoko-face-color 300,330,860,890   # face crop
+```
+
+The eye positions in `blink.py` are fitted to this portrait; a new source image needs new ones.
+In the real client, respect `prefers-reduced-motion` by showing a still frame (the scripts also
+write `*-open.png`).
+
 `hermes-logo-white.svg` (dark theme) and `hermes-logo-black.svg` (light theme) are the Hermes Agent
-logo supplied by the owner.
+logo supplied by the owner; Motoko's mark replaced it in the artboards.
 
 ## Screens
 
@@ -43,7 +65,8 @@ logo supplied by the owner.
 - Operations workflow: Detect › Plan › Decide › Claim › Proof › Close, with the current item.
 
 **Ask Motoko (`Ask`)**
-- The Hermes logo centred above the conversation; it shrinks once the conversation starts.
+- Motoko's blinking dot-matrix mark centred above the conversation, in a ring; it shrinks once
+  the conversation starts and grows in voice mode.
 - Chat / Terminal switch, like herdr's own pane views. Terminal is the herdr pane where Hermes
   runs, with the existing key bar and terminal input line.
 - Chat replies show the checks Hermes ran, then the answer, then optional cards (decisions with
