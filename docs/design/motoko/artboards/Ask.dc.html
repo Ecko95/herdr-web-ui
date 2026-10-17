@@ -125,7 +125,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
                   </sc-if>
                   <sc-if value="{{m.isHermes}}" hint-placeholder-val="{{ true }}">
                     <div style="display: flex; gap: 12px; align-items: flex-start">
-                      <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; overflow: hidden"><img src="../logo/motoko-face-color.webp" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover"></span>
+                      <button type="button" onClick="{{openViewer}}" aria-label="View Motoko full size" title="View Motoko full size" style="flex: none; width: 30px; height: 30px; padding: 0; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; overflow: hidden; cursor: zoom-in"><img src="../logo/motoko-face-color.webp" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover"></button>
                       <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px">
                         <sc-if value="{{m.hasTools}}" hint-placeholder-val="{{ false }}">
                           <div style="display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: 8px; background: #181613; border: 1px solid #2d2924; font-family: 'JetBrains Mono', monospace; font-size: 12px">
@@ -176,7 +176,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
 
               <sc-if value="{{pending}}" hint-placeholder-val="{{ false }}">
                 <div style="display: flex; gap: 12px; align-items: center; color: #9b9183; font-size: 13px">
-                  <span style="flex: none; width: 30px; height: 30px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; overflow: hidden"><img src="../logo/motoko-face-color.webp" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover"></span>
+                  <button type="button" onClick="{{openViewer}}" aria-label="View Motoko full size" title="View Motoko full size" style="flex: none; width: 30px; height: 30px; padding: 0; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; overflow: hidden; cursor: zoom-in"><img src="../logo/motoko-face-color.webp" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover"></button>
                   Motoko is checking the rigs…
                 </div>
               </sc-if>
@@ -286,6 +286,19 @@ a{color:#f0a830}a:hover{color:#f6bb55}
       </sc-if>
     </main>
   </div>
+  <sc-if value="{{viewerOpen}}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-modal="true" aria-label="Motoko, full size" style="position: fixed; inset: 0; z-index: 50; box-sizing: border-box; padding: 64px 24px 24px; background: rgba(10, 9, 8, 0.94); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px">
+      <div style="position: absolute; top: 14px; right: 16px; left: 16px; display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">
+        <span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>motoko · Hermes Agent</span>
+        <span style="flex: 1 1 auto"></span>
+        <a href="../logo/motoko-wine.webp" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; text-decoration: none; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>Open in new window</a>
+        <button type="button" onClick="{{closeViewer}}" aria-label="Close" title="Close" style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; cursor: pointer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+      <img src="../logo/motoko-wine.webp" alt="Motoko, smiling with a glass of white wine" style="display: block; max-width: min(1400px, 100%); max-height: min(860px, 100%); width: auto; height: auto; object-fit: contain">
+    </div>
+  </sc-if>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"startEmpty":{"editor":"boolean","default":false},"logoStyle":{"editor":"enum","options":["dots","color"],"default":"dots"},"$preview":{"width":1440,"height":1100}}'>
@@ -300,7 +313,7 @@ class Component extends DCLogic {
       { role: 'hermes', kind: 'host', text: 'vps-02 is up and its seats are fine, but the disk is at 88%. ops-disk-0142 is my plan to free about 9 GB. It is waiting for your decision.',
         tools: [{ cmd: 'ssh vps-02 df -h /', result: '88% used' }] }
     ];
-    this.state = { mode: 'chat', voice: 'idle', draft: '', pending: false, boot: true, messages: props.startEmpty ? [] : seed };
+    this.state = { mode: 'chat', voice: 'idle', draft: '', pending: false, boot: true, viewer: false, messages: props.startEmpty ? [] : seed };
     this.timer = null;
   }
   componentWillUnmount() { if (this.timer) clearTimeout(this.timer); if (this.bootTimer) clearTimeout(this.bootTimer); }
@@ -352,6 +365,7 @@ class Component extends DCLogic {
       at: function (k) { return (t0 + rows.length * step + 0.15 + k * 0.35).toFixed(2) + 's'; }
     };
     return {
+      viewerOpen: !!(this.state && this.state.viewer), openViewer: function () { self.setState({ viewer: true }); }, closeViewer: function () { self.setState({ viewer: false }); },
       accent: accent,
       isChat: s.mode === 'chat', isTerminal: s.mode === 'terminal',
       chatTabBg: s.mode === 'chat' ? '#2a2621' : 'transparent', chatTabFg: s.mode === 'chat' ? '#f2ebdf' : '#9b9183',

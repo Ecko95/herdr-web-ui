@@ -20,7 +20,7 @@ a{color:#f0a830}a:hover{color:#f6bb55}
   <header style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #181613; border-bottom: 1px solid #2d2924">
     <span style="font-family: 'JetBrains Mono', monospace; color: #9b9183; font-size: 13px">herdr /</span>
     <span style="font-size: 17px; font-weight: 600; color: #f2ebdf">Motoko</span>
-    <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9b9183"><img src="../logo/motoko-face-color.webp" alt="" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>Hermes</span>
+    <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #9b9183"><button type="button" onClick="{{openViewer}}" aria-label="View Motoko full size" title="View Motoko full size" style="flex: none; width: 28px; height: 28px; padding: 0; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{accent}}; background: #181613; display: inline-flex; overflow: hidden; cursor: zoom-in"><img src="../logo/motoko-face-color.webp" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover"></button><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>Hermes</span>
   </header>
 
   <div style="flex: 1 1 auto; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 16px">
@@ -80,16 +80,35 @@ a{color:#f0a830}a:hover{color:#f6bb55}
     <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 60px; font-size: 11px; color: #9b9183; text-decoration: none">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6M8 13h8M8 17h5"></path></svg>Audit</a>
   </nav>
+  <sc-if value="{{viewerOpen}}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-modal="true" aria-label="Motoko, full size" style="position: fixed; inset: 0; z-index: 50; box-sizing: border-box; padding: 64px 24px 24px; background: rgba(10, 9, 8, 0.94); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px">
+      <div style="position: absolute; top: 14px; right: 16px; left: 16px; display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9b9183">
+        <span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6cb8d6"></span>motoko · Hermes Agent</span>
+        <span style="flex: 1 1 auto"></span>
+        <a href="../logo/motoko-wine.webp" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; text-decoration: none; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>Open in new window</a>
+        <button type="button" onClick="{{closeViewer}}" aria-label="Close" title="Close" style="width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #3e3830; background: #211e1a; color: #f2ebdf; cursor: pointer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+      <img src="../logo/motoko-wine.webp" alt="Motoko, smiling with a glass of white wine" style="display: block; max-width: min(1400px, 100%); max-height: min(860px, 100%); width: auto; height: auto; object-fit: contain">
+    </div>
+  </sc-if>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#f0a830","options":["#f0a830","#6cb8d6","#93c36b"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { viewer: false };
+  }
   renderVals() {
     var C = { blocked: '#ff7b70', done: '#93c36b', warn: '#f9e2af' };
     function metric(label, pct) {
       return { label: label, pct: pct + '%', color: pct >= 85 ? C.blocked : pct >= 75 ? C.warn : C.done };
     }
+    var self = this;
     return {
+      viewerOpen: !!(this.state && this.state.viewer), openViewer: function () { self.setState({ viewer: true }); }, closeViewer: function () { self.setState({ viewer: false }); },
       accent: this.props.accent ?? '#f0a830',
       hosts: [
         { name: 'vps-01', state: 'Healthy', color: C.done, metrics: [metric('CPU', 34), metric('Mem', 58), metric('Disk', 47)] },

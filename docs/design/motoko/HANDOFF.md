@@ -32,6 +32,7 @@ dot-matrix image) that blinks every few seconds, with an occasional double blink
 | `logo/motoko-mono-full.webp` | Default boot-screen portrait on Ask Motoko: warm white dots, pink irises, transparent background, 200×200 dots, 1000 px |
 | `logo/motoko-color-full.webp` | Colour variant (the artboard's `logoStyle` tweak), transparent, 200×200 dots, 1000 px |
 | `logo/motoko-face-color.webp` | Face close-up for small places: chat avatar, header status |
+| `logo/motoko-wine.webp` | Full-size Motoko (transparent) shown when the face close-up is clicked |
 | `logo/motoko-source.webp` | The source portrait |
 | `logo/blink.py`, `logo/dots.py` | Regenerate them (Python 3 with Pillow and NumPy): `blink.py` paints the half-closed and closed eye frames, `dots.py` turns each frame into the dot grid and writes the animation |
 
@@ -43,6 +44,12 @@ python3 dots.py . 28 4 color motoko-face-color 300,330,860,890   # face crop
 ```
 
 The eye positions in `blink.py` are fitted to this portrait; a new source image needs new ones.
+**Full-size viewer.** Every face close-up (chat avatars on Ask, the Hermes status in the
+Overview and phone top bars) is a button, "View Motoko full size", with a zoom-in cursor. It opens
+a full-screen viewer on a dark backdrop showing `motoko-wine.webp`, with "Open in new window"
+(opens the image in a new tab) and Close. Reuse `src/components/ImageLightbox.tsx` for the viewer,
+so Escape, focus return and the phone layout come for free.
+
 In the real client, respect `prefers-reduced-motion` by showing a still frame (the scripts also
 write `*-open.png`).
 
