@@ -167,7 +167,7 @@ function pushedRefresh(): ConversationRefresh {
 }
 
 describe("conversation invalidation refresh", () => {
-  it("coalesces pushes at exactly 2000ms and keeps the 10s backstop, ETag and 304 identity", async () => {
+  it("coalesces pushes at exactly 1000ms and keeps the 10s backstop, ETag and 304 identity", async () => {
     const clock = refreshClock();
     const refresh = pushedRefresh();
     const requests: { resolve: (response: Response) => void }[] = [];
@@ -192,7 +192,7 @@ describe("conversation invalidation refresh", () => {
     requests[0]!.resolve(new Response(JSON.stringify({ source: "claude-transcript", turns: [], cursor: null }), { headers: { etag: "\"push-v1\"" } }));
     await settleRefresh();
     expect(requests).toHaveLength(1);
-    clock.advance(1899);
+    clock.advance(899);
     refresh.invalidate();
     expect(requests).toHaveLength(1);
     clock.advance(1);
@@ -239,12 +239,12 @@ describe("conversation invalidation refresh", () => {
       refresh.invalidate();
       await settleRefresh();
     }
-    expect(starts).toEqual([0, 2000, 4000]);
+    expect(starts).toEqual([0, 1000, 2000, 3000, 4000, 5000]);
     clock.advance(699);
-    expect(starts).toHaveLength(3);
+    expect(starts).toHaveLength(6);
     clock.advance(1);
     await settleRefresh();
-    expect(starts).toEqual([0, 2000, 4000, 6000]);
+    expect(starts).toEqual([0, 1000, 2000, 3000, 4000, 5000, 6000]);
     expect(answers.at(-1)?.turns[0]?.parts[0]).toEqual({ kind: "text", text: "output-53" });
     expect(maxActive).toBe(1);
     // A push after idle is not delayed until the periodic backstop.
@@ -252,7 +252,7 @@ describe("conversation invalidation refresh", () => {
     output = "after-idle";
     refresh.invalidate();
     await settleRefresh();
-    expect(starts).toEqual([0, 2000, 4000, 6000, 8500]);
+    expect(starts).toEqual([0, 1000, 2000, 3000, 4000, 5000, 6000, 8500]);
     expect(answers.at(-1)?.turns[0]?.parts[0]).toEqual({ kind: "text", text: "after-idle" });
     refresh.stop();
   });
@@ -270,7 +270,7 @@ describe("conversation invalidation refresh", () => {
     refresh.refresh();
     await settleRefresh();
     expect(starts).toEqual([0, 500]);
-    clock.advance(1500);
+    clock.advance(500);
     expect(starts).toEqual([0, 500]);
     // The explicit read also establishes the next push deadline.
     refresh.invalidate();
@@ -278,7 +278,7 @@ describe("conversation invalidation refresh", () => {
     expect(starts).toEqual([0, 500]);
     clock.advance(1);
     await settleRefresh();
-    expect(starts).toEqual([0, 500, 2500]);
+    expect(starts).toEqual([0, 500, 1500]);
     refresh.stop();
   });
 
@@ -338,7 +338,7 @@ describe("conversation invalidation refresh", () => {
     clock.advance(100);
     output = "during-second";
     refresh.invalidate();
-    clock.advance(1700);
+    clock.advance(700);
     output = "latest-second";
     refresh.invalidate();
     releases[1]!();
@@ -348,7 +348,7 @@ describe("conversation invalidation refresh", () => {
     clock.advance(199);
     expect(starts).toEqual([0, 2500]);
     clock.advance(1);
-    expect(starts).toEqual([0, 2500, 4500]);
+    expect(starts).toEqual([0, 2500, 3500]);
     releases[2]!();
     await settleRefresh();
     expect(shown).toBe("latest-second");
@@ -392,8 +392,8 @@ describe("conversation invalidation refresh", () => {
     gap.resolve();
     await settleRefresh();
     expect(reads).toEqual(["latest", "gap", "older"]);
-    // the older page is still loading: the pushed newest read keeps its own 2 s deadline
-    clock.advance(1900);
+    // the older page is still loading: the pushed newest read keeps its own 1 s deadline
+    clock.advance(900);
     await settleRefresh();
     expect(reads).toEqual(["latest", "gap", "older", "latest"]);
     // and an explicit refresh (a clear, a send) does not wait for it either

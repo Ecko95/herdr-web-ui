@@ -185,6 +185,23 @@ total deadline and two seconds per command, with at most 1 MiB of command output
 An incomplete or ambiguous answer is not used; unrelated workspaces' retired
 sessions do not consume the page budget.
 
+Overlapping reads of the same pane share one lookup. A proven binding is kept for
+at most 30 seconds while the pane's process identity and transcript header still
+match. The shared SDK index normally invalidates it, except for bounded,
+checksum-valid, sequential version-4 heartbeat appends belonging to other
+processes and sessions. The guard includes every session the SDK listed for the
+pane's PIDs, including retired rows and generation-zero fences: a heartbeat can
+revive a stale session even when the heartbeat's PID differs from its registered
+PID. Ignoring an unrelated heartbeat never renews the binding's age.
+
+This narrow exception follows GJC 0.18.9's `session-index.ts` reducer: heartbeats
+change only their own identity's liveness, activity and heartbeat time, not its
+registered ownership, location or ambiguity. A changed snapshot, replaced or
+truncated log, incomplete row, invalid checksum or sequence, unrecognized record,
+or append over 256 KiB requires another SDK lookup. The bridge does not select a
+session from index records. Null results remain uncached, so the first saved
+message after `/new` is discoverable without another index change.
+
 The native transcript must remain inside the canonical `~/.gjc/agent/sessions/`
 store and its header must identify the selected session and workspace. The pane's
 process is checked again after discovery. Session titles, visible answers, file

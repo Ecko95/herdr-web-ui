@@ -17,7 +17,7 @@ class FakeChild extends EventEmitter {
 
 function run(options: { timeout?: number; signal?: AbortSignal } = {}) {
   const child = new FakeChild(), group: [number, string | number | undefined][] = [];
-  const result = runCommand("/", ["git", "fetch"], options.signal, options.timeout ?? 60_000, {
+  const result = runCommand("/", ["git", "fetch"], options.signal, options.timeout ?? 60_000, undefined, {
     spawn: (() => child) as never,
     kill: ((pid: number, signal?: string | number) => { group.push([pid, signal]); return true; }) as never,
   });
@@ -25,10 +25,20 @@ function run(options: { timeout?: number; signal?: AbortSignal } = {}) {
 }
 
 describe("update command cancel (IC5)", () => {
+  it("keeps close-time helper cleanup after live cancellation and leader exit", async () => {
+    const controller = new AbortController(), { child, group, result } = run({ signal: controller.signal });
+    controller.abort();
+    expect(group).toEqual([[-4242, "SIGTERM"]]);
+    child.exit(0);
+    child.close(0);
+    await expect(result).rejects.toThrow("Update cancelled");
+    expect(group).toEqual([[-4242, "SIGTERM"], [-4242, "SIGKILL"]]);
+  });
+
   it("signals the group of a live child, then rejects on close", async () => {
     const controller = new AbortController(), { child, group, result } = run({ signal: controller.signal });
     controller.abort();
-    expect(group).toEqual([[-4242, "SIGKILL"]]);
+    expect(group).toEqual([[-4242, "SIGTERM"]]);
     child.exit(null, "SIGKILL"); child.close(null);
     await expect(result).rejects.toThrow("Update cancelled");
   });
@@ -74,7 +84,7 @@ describe("update command cancel (IC5)", () => {
     const { child, group, result } = run({ timeout: 10 });
     const deadline = Date.now() + 2000;
     while (group.length === 0) { if (Date.now() > deadline) throw new Error("no group signal"); await Bun.sleep(5); }
-    expect(group).toEqual([[-4242, "SIGKILL"]]);
+    expect(group).toEqual([[-4242, "SIGTERM"]]);
     child.exit(null, "SIGKILL"); child.close(null);
     await expect(result).rejects.toThrow("git timed out");
   });
