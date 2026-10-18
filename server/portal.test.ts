@@ -99,9 +99,9 @@ async function bounded<T>(promise: Promise<T>, what: string, timeoutMs = 2_000):
   }
 }
 
-async function waitFor(done: () => boolean, what: string): Promise<void> {
+async function waitFor(done: () => boolean | Promise<boolean>, what: string): Promise<void> {
   const deadline = Date.now() + 2_000;
-  while (!done()) {
+  while (!await done()) {
     if (Date.now() >= deadline) throw new Error(`Timed out: ${what}`);
     await Bun.sleep(10);
   }
@@ -511,7 +511,10 @@ describe("running Portal", () => {
     const service = new PortalService({ stateDir, fetch: relay() });
     const internals = service as unknown as { processArgv(pid: number): Promise<string[] | null> };
     try {
-      await waitFor(() => alive(unrelated.pid), "unrelated interpreter started");
+      await waitFor(async () => {
+        const argv = await internals.processArgv(unrelated.pid);
+        return argv?.[1] === scriptPath && argv[2] === "expose";
+      }, "unrelated interpreter started");
       expect((await internals.processArgv(unrelated.pid))?.slice(1, 3)).toEqual([scriptPath, "expose"]);
       await service.resume({ port: 7317, tokenSet: false, serveOnly: false });
       expect(alive(unrelated.pid)).toBe(true);
