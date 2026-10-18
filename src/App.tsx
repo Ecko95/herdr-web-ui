@@ -1245,7 +1245,7 @@ export function App() {
       if (sheetSteppedOff()) return;
       const link = readLink(window.location.search);
       restoreMotoko(link.page);
-      poppedTo.current = true;
+      if ((writtenLink.current?.page ?? null) !== (link.page ?? null)) poppedTo.current = true;
       setAutoSelected(false);
       // before the PCs are in, nothing can say the entry's PC is still set up: it waits as a link
       // opened with the page does, settled against its roster or answered with a note once they are
