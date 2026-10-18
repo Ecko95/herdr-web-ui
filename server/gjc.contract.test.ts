@@ -1,11 +1,13 @@
 import { afterAll, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readlinkSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { herdrRpc, herdrSocketPath, sessionSnapshot, workspaceClose, workspaceCreate, paneRead } from "./herdr/client.ts";
-import { ConversationUnavailable, gjcTranscriptPath, paneConversation } from "./conversation.ts";
+import { ConversationUnavailable, forgetTranscriptState, gjcTranscriptPath, paneConversation } from "./conversation.ts";
 import { isGjcProcess } from "./gjc-runtime.ts";
 import { startShellAgent } from "./shell-agent.ts";
+import { createServer } from "./index.ts";
 
 const home = realpathSync(mkdtempSync(join(tmpdir(), "herdr-gjc-binding-")));
 const agentDir = join(home, ".gjc", "agent");
@@ -23,7 +25,8 @@ writeFileSync(script, "if (process.env.GJC_TEST_CWD) process.chdir(process.env.G
 mkdirSync(bin);
 // The fixture accepts only the public raw global session.list operation. Its registry is test-owned JSON, never SDK state.
 writeFileSync(sdkCli, `
-const { readFileSync } = require("node:fs");
+const { appendFileSync, readFileSync } = require("node:fs");
+if (process.env.GJC_TEST_CALLS) appendFileSync(process.env.GJC_TEST_CALLS, "sdk\\n");
 const args = process.argv.slice(2);
 const value = (flag) => { const i = args.indexOf(flag); return i < 0 ? undefined : args[i + 1]; };
 if (args[0] !== "sdk" || args[1] !== "session" || args[2] !== "raw" || args[3] !== "global"
@@ -39,6 +42,7 @@ if (state.kind === "unavailable") {
   process.exit(1);
 }
 if (state.kind === "malformed") { process.stdout.write("not-json"); process.exit(0); }
+if (state.kind === "timeout") await new Promise(() => { setInterval(() => {}, 1000); });
 let input;
 try { if (value("--json-input") !== undefined) input = JSON.parse(value("--json-input")); }
 catch { process.exit(64); }
@@ -148,7 +152,7 @@ function writeRegistry(rows: Record<string, unknown>[], paths: Record<string, st
 }
 
 async function withSdkFixture<T>(run: () => Promise<T>): Promise<T> {
-  const keys = ["HOME", "HERDR_SOCKET", "PATH", "GJC_TEST_REGISTRY", "GJC_TEST_AGENT_DIR"] as const;
+  const keys = ["HOME", "HERDR_SOCKET", "PATH", "GJC_TEST_REGISTRY", "GJC_TEST_AGENT_DIR", "GJC_TEST_CALLS"] as const;
   const previous = new Map(keys.map((key) => [key, process.env[key]]));
   process.env["HOME"] = home;
   process.env["HERDR_SOCKET"] = herdrSocketPath();
@@ -168,6 +172,30 @@ async function withSdkFixture<T>(run: () => Promise<T>): Promise<T> {
 function record(cwd: string, answer: string, id: string, title = "shared title"): string {
   return JSON.stringify({ type: "session", cwd, id, title }) + "\n"
     + JSON.stringify({ type: "message", message: { role: "assistant", content: [{ type: "text", text: answer }] } }) + "\n";
+}
+
+function signedSdkIndexRow(
+  indexSeq: number,
+  type: string,
+  sessionId: string,
+  pid: number,
+  ts: number,
+): string {
+  const unsigned = {
+    version: 4,
+    indexSeq,
+    type,
+    sessionId,
+    locator: { cwd: home, worktreeRoot: null, stateRoot: home },
+    pid,
+    processIncarnation: `test-process-${pid}`,
+    hostIncarnation: "test-host-incarnation",
+    endpointGeneration: 1,
+    activity: { state: "idle", at: ts },
+    ts,
+  };
+  const checksum = createHash("sha256").update(JSON.stringify(unsigned)).digest("hex");
+  return `${JSON.stringify({ ...unsigned, checksum })}\n`;
 }
 
 async function expectConversation(id: string, answer: string): Promise<void> {
@@ -192,6 +220,86 @@ it("SDK identity ignores a copied neighboring answer on the pane screen", async 
   expect(await gjcTranscriptPath(id, home, home)).toBe(a);
   await expectConversation(id, "OK");
 }));
+
+it("keeps subprocess-resolved SDK pane bindings across unrelated signed heartbeat appends and invalidates /new", async () => withSdkFixture(async () => {
+  const indexDir = join(agentDir, "sdk", "sessions");
+  const indexPath = join(indexDir, "index.jsonl");
+  const callsPath = join(home, "sdk-cli-calls.log");
+  try {
+    mkdirSync(indexDir, { recursive: true });
+    process.env["GJC_TEST_CALLS"] = callsPath;
+
+    const firstSession = "heartbeat-pane-first";
+    const secondSession = "heartbeat-pane-second";
+    const freshSession = "heartbeat-pane-first-new";
+    const firstPath = join(dir, `${firstSession}.jsonl`);
+    const secondPath = join(dir, `${secondSession}.jsonl`);
+    const freshPath = join(dir, `${freshSession}.jsonl`);
+    writeFileSync(firstPath, record(home, "first answer", firstSession));
+    writeFileSync(secondPath, record(home, "second answer", secondSession));
+    writeFileSync(freshPath, record(home, "fresh answer", freshSession));
+
+    const firstPane = await pane([dir], "first answer");
+    const secondPane = await pane([dir], "second answer");
+    await waitForScreen(firstPane, "first answer");
+    await waitForScreen(secondPane, "second answer");
+    await setAgent(firstPane, "gjc");
+    await setAgent(secondPane, "gjc");
+    const firstProcess = await gjcProcess(firstPane);
+    const secondProcess = await gjcProcess(secondPane);
+    expect(firstProcess.pid).not.toBe(secondProcess.pid);
+
+    const timestamp = Date.now();
+    writeFileSync(indexPath,
+      signedSdkIndexRow(1, "host_registered", firstSession, firstProcess.pid, timestamp)
+      + signedSdkIndexRow(2, "host_registered", secondSession, secondProcess.pid, timestamp + 1));
+    const paths = { [firstSession]: firstPath, [secondSession]: secondPath, [freshSession]: freshPath };
+    writeRegistry([
+      sdkRow(firstProcess.pid, home, firstSession),
+      sdkRow(secondProcess.pid, home, secondSession),
+    ], paths);
+
+    expect(await gjcTranscriptPath(firstPane, home, home)).toBe(firstPath);
+    expect(readFileSync(callsPath, "utf8").split("\n").filter(Boolean)).toHaveLength(2);
+    expect(await gjcTranscriptPath(secondPane, home, home)).toBe(secondPath);
+    expect(readFileSync(callsPath, "utf8").split("\n").filter(Boolean)).toHaveLength(4);
+
+    let indexSeq = 2;
+    for (let wave = 1; wave <= 3; wave += 1) {
+      const heartbeatSeq = ++indexSeq;
+      const heartbeatPid = 900_000 + heartbeatSeq;
+      appendFileSync(indexPath, signedSdkIndexRow(
+        heartbeatSeq,
+        "host_heartbeat",
+        `unrelated-heartbeat-${heartbeatSeq}`,
+        heartbeatPid,
+        timestamp + heartbeatSeq,
+      ));
+      expect(await gjcTranscriptPath(firstPane, home, home)).toBe(firstPath);
+      expect(await gjcTranscriptPath(secondPane, home, home)).toBe(secondPath);
+      expect(readFileSync(callsPath, "utf8").split("\n").filter(Boolean)).toHaveLength(4);
+    }
+
+    writeRegistry([
+      sdkRow(firstProcess.pid, home, freshSession),
+      sdkRow(secondProcess.pid, home, secondSession),
+    ], paths);
+    const registeredSeq = ++indexSeq;
+    appendFileSync(indexPath, signedSdkIndexRow(
+      registeredSeq,
+      "host_registered",
+      freshSession,
+      firstProcess.pid,
+      timestamp + registeredSeq,
+    ));
+    expect(await gjcTranscriptPath(firstPane, home, home)).toBe(freshPath);
+    expect(readFileSync(callsPath, "utf8").split("\n").filter(Boolean)).toHaveLength(6);
+  } finally {
+    forgetTranscriptState();
+    rmSync(indexDir, { recursive: true, force: true });
+    rmSync(callsPath, { force: true });
+  }
+}), 15_000);
 
 it("SDK maps same-cwd panes by exact GJC PID despite identical answers, titles, and mtimes", async () => withSdkFixture(async () => {
   const a = join(dir, "same-answer-a.jsonl"), b = join(dir, "same-answer-b.jsonl");
@@ -232,6 +340,54 @@ it("SDK follows /new or resume when the same GJC PID changes from A to B without
   expect((await paneRead({ paneId: id })).text).toContain("A");
   expect(await gjcTranscriptPath(id, home, home)).toBe(b);
   await expectConversation(id, "B");
+}));
+
+it("conversation API distinguishes a temporary SDK failure from a replaced or missing session", async () => withSdkFixture(async () => {
+  const a = join(dir, "transient-a.jsonl"), b = join(dir, "transient-b.jsonl");
+  writeFileSync(a, record(home, "Original session answer", "transient-a"));
+  writeFileSync(b, record(home, "Replacement session answer", "transient-b"));
+  const id = await pane([dir]);
+  const { pid } = await gjcProcess(id);
+  await setAgent(id, "gjc");
+  const row = sdkRow(pid, home, "transient-a");
+  const paths = { "transient-a": a, "transient-b": b };
+  writeRegistry([row], paths);
+  const app = createServer({ port: 0, hostname: "127.0.0.1", token: "", stateDir: join(home, "transient-api-state") });
+  const url = `http://127.0.0.1:${app.port}/api/pane/conversation?pane_id=${encodeURIComponent(id)}`;
+  try {
+    const first = await fetch(url);
+    expect(first.status).toBe(200);
+    expect((await first.json()).turns[0].parts[0].text).toBe("Original session answer");
+
+    writeRegistry([row], paths, "timeout");
+    const timeout = await fetch(url);
+    expect(timeout.status).toBe(504);
+    expect(await timeout.json()).toMatchObject({ error: { code: "gjc_sdk_timeout" } });
+
+    // a gjc that fails outright (not installed, too old, broker down) does not clear by
+    // retrying: it keeps the terminal fallback it had before
+    writeRegistry([row], paths, "unavailable");
+    const unavailable = await fetch(url);
+    expect(unavailable.status).toBe(200);
+    expect(await unavailable.json()).toMatchObject({ source: "scrollback" });
+
+    writeRegistry([row], paths);
+    const recovered = await fetch(url);
+    expect(recovered.status).toBe(200);
+    expect((await recovered.json()).turns[0].parts[0].text).toBe("Original session answer");
+
+    writeRegistry([sdkRow(pid, home, "transient-b")], paths);
+    const replaced = await fetch(url);
+    expect(replaced.status).toBe(200);
+    expect((await replaced.json()).turns[0].parts[0].text).toBe("Replacement session answer");
+
+    writeRegistry([], paths);
+    const missing = await fetch(url);
+    expect(missing.status).toBe(200);
+    expect(await missing.json()).toMatchObject({ source: "scrollback", turns: [] });
+  } finally {
+    app.stop();
+  }
 }));
 
 it("SDK scopes discovery so unrelated retired history cannot exhaust the pane's page budget", async () => withSdkFixture(async () => {

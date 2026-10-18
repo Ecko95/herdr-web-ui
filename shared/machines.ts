@@ -1,9 +1,10 @@
+import type { AgentRowTokens } from "./pane-tokens.ts";
 import type { SharedPreferences } from "./preferences.ts";
 import type { HealthAuth, ServerMessage, SessionSnapshot } from "./protocol.ts";
 
 export const LOCAL_MACHINE = "local";
 export const BRIDGE_PROTOCOL = 1;
-export const REMOTE_BUNDLE_VERSION = "30";
+export const REMOTE_BUNDLE_VERSION = "31";
 export interface PaneTarget { machine_id: string; pane_id: string }
 export type MachineState = "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
 export interface SshTarget {
@@ -81,7 +82,9 @@ export interface SetupJob {
 export type SetupAction = { action: "answer"; challenge_id: string; answer: string } | { action: "approve" } | { action: "cancel" };
 /** `preferences`: what every browser of this server shares changed (shared/preferences.ts) */
 export type MachineEvent = { type: "machines"; machines: Machine[] } | { type: "machine-message"; machine_id: string; message: ServerMessage }
-  | { type: "preferences"; preferences: SharedPreferences };
+  | { type: "preferences"; preferences: SharedPreferences }
+  /** the `$name` tokens herdr's `[ui.sidebar.agents]` rows draw on this server's PC, for every PC's agent rows (server/herdr-sidebar.ts) */
+  | { type: "herdr-sidebar"; agents: AgentRowTokens | null };
 export interface BridgeHealth { ok: true; auth: HealthAuth; bridge_protocol: number }
 export interface BridgeIdentity {
   pid: number;

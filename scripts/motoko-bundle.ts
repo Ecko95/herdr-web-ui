@@ -19,7 +19,7 @@ for (const name of ["package.json", "bun.lock", "bunfig.toml", "LICENSE", "THIRD
   if (existsSync(join(source, name))) cpSync(join(source, name), join(output, name));
 }
 mkdirSync(join(output, "scripts"));
-for (const name of ["plugin.ts", "plugin-port.ts", "plugin-runtime.ts"]) cpSync(join(source, "scripts", name), join(output, "scripts", name));
+for (const name of ["plugin.ts", "plugin-port.ts", "plugin-runtime.ts", "plugin-state.ts"]) cpSync(join(source, "scripts", name), join(output, "scripts", name));
 const install = Bun.spawnSync([process.execPath, "install", "--production", "--frozen-lockfile", "--ignore-scripts"], { cwd: output, env: process.env, stdout: "pipe", stderr: "pipe" });
 if (install.exitCode !== 0) throw new Error(install.stderr.toString());
 if (hash(join(output, "bun.lock")) !== hash(join(source, "bun.lock"))) throw new Error("Lockfile changed");

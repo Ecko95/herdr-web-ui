@@ -8,10 +8,12 @@
  * setting by setting: a change made here and not yet sent stays, and goes out over what arrived.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { SHARED_SETTING_KEYS, type PreferencesChange, type SharedPreferences, type SharedSettingKey } from "../../shared/preferences.ts";
+import { mirrorPalette, SHARED_SETTING_KEYS, type PreferencesChange, type SharedPreferences, type SharedSettingKey } from "../../shared/preferences.ts";
 import { ApiError, fetchPreferences, savePreferences } from "./api.ts";
+import { DEFAULT_THEME } from "./themes.ts";
 import { sanitizeSettings, sharedSettings, useSettings, type Settings } from "./settings.ts";
 import { currentSidebarPins, setSidebarPins, subscribeSidebarPins } from "./sidebarPins.ts";
+import { userErrorMessage, type UserError } from "./userError.ts";
 
 const SEND_AFTER_MS = 600;
 /** a request that failed on the way (the network, a restart) is tried again after this */
@@ -59,15 +61,27 @@ export interface Taken {
 export function takePreferences(base: Baseline, local: Local, remote: SharedPreferences, inFlight: PreferencesChange | null, force = false): Taken {
   const settings: Shared = { ...base.settings };
   const patch: Record<string, unknown> = {};
+  const incoming = { ...remote.settings };
+  // Read an old document's fixed-mode appearance into its active side. System's palette
+  // was unused, so it must not replace this device's migrated pair. This is passive
+  // migration only: the derived side advances the baseline too, never a correcting PUT.
+  if (!("darkTheme" in incoming) && !("lightTheme" in incoming) && "palette" in incoming) {
+    const mode = incoming.theme ?? base.settings.theme;
+    if (mode === "dark") incoming.darkTheme = incoming.palette;
+    if (mode === "light") incoming.lightTheme = incoming.palette;
+  }
   for (const key of SHARED_SETTING_KEYS) {
-    if (!(key in remote.settings)) continue;
-    const value = remote.settings[key];
-    if (!same(sanitizeSettings({ ...local.settings, [key]: value })[key], value)) continue;
+    if (!(key in incoming)) continue;
+    const value = incoming[key];
+    if (!same(sanitizeSettings({ [key]: value })[key], value)) continue;
     const sent = inFlight !== null && key in inFlight.settings && same(inFlight.settings[key], local.settings[key]);
     const edited = !same(local.settings[key], base.settings[key]) && !sent;
     settings[key] = value;
     if (force || !edited) patch[key] = value;
   }
+  // Palette is a derived mirror, not an independent local edit. A legacy document with no
+  // sides must not overwrite a device's migrated System pair or provoke a correcting PUT.
+  settings.palette = mirrorPalette(settings.theme, settings.darkTheme ?? DEFAULT_THEME, settings.lightTheme ?? DEFAULT_THEME);
   let pins: string[] | null = null;
   if (remote.pins !== undefined) {
     if (base.pins === null && !force) pins = [...remote.pins, ...local.pins.filter((pin) => !remote.pins!.includes(pin))];
@@ -80,7 +94,18 @@ export function takePreferences(base: Baseline, local: Local, remote: SharedPref
   return { base: { settings, pins: remote.pins === undefined ? base.pins : [...remote.pins] }, patch: patch as Partial<Settings>, pins };
 }
 
-export function usePreferencesSync(enabled: boolean): (preferences: SharedPreferences) => void {
+export interface PreferencesSync {
+  /** a document the event stream brought */
+  receive(preferences: SharedPreferences): void;
+  /**
+   * the last change the server refused to save, as a sentence for Settings (lib/userError.ts); null
+   * once a save lands. The change is sent again meanwhile. A watching device and a server without
+   * the route are not refusals.
+   */
+  saveError: UserError | null;
+}
+
+export function usePreferencesSync(enabled: boolean): PreferencesSync {
   const { settings, update } = useSettings();
   const pins = useSyncExternalStore(subscribeSidebarPins, currentSidebarPins, currentSidebarPins);
   const latest = useRef<Local>({ settings, pins });
@@ -102,6 +127,7 @@ export function usePreferencesSync(enabled: boolean): (preferences: SharedPrefer
   // the send effect runs again when this moves: after a send, or a failed one's wait
   const [attempt, setAttempt] = useState(0);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [saveError, setSaveError] = useState<UserError | null>(null);
   // the baseline is a ref: a document that changes nothing here still moves what is pending
   const [, setTaken] = useState(0);
 
@@ -153,21 +179,36 @@ export function usePreferencesSync(enabled: boolean): (preferences: SharedPrefer
       const body = JSON.parse(pending) as PreferencesChange;
       inFlight.current = body;
       savePreferences(body).then((saved) => {
+        // An older server silently drops new names. Acknowledge exactly what was sent, not
+        // today's local value: an edit made while the request was in flight still goes next.
+        for (const key of SHARED_SETTING_KEYS) {
+          if (key in body.settings && !(key in saved.settings)) base.current.settings[key] = body.settings[key];
+        }
         // the answer is the whole document as this change left it: one from elsewhere that landed
         // before comes with it, one that landed after was held and is read now
         absorb(saved);
         settled();
+        setSaveError(null);
         // what changed while this was on its way goes out now
         setAttempt((count) => count + 1);
       }).catch((error: unknown) => {
         settled();
-        if (error instanceof ApiError && error.status === 403) readOnly.current = true;
-        else if (error instanceof ApiError && error.status === 404) off.current = true;
-        else retry = window.setTimeout(() => setAttempt((count) => count + 1), RETRY_MS);
+        if (error instanceof ApiError && error.status === 403) {
+          readOnly.current = true;
+          setSaveError(null);
+        } else if (error instanceof ApiError && error.status === 404) {
+          off.current = true;
+          setSaveError(null);
+        } else {
+          // the same refusal every RETRY_MS is one state, not a render each time
+          const next = userErrorMessage(error);
+          setSaveError((before) => before !== null && before.message === next.message && before.detail === next.detail ? before : next);
+          retry = window.setTimeout(() => setAttempt((count) => count + 1), RETRY_MS);
+        }
       });
     }, SEND_AFTER_MS);
     return () => { window.clearTimeout(timer); window.clearTimeout(retry); };
   }, [enabled, loaded, pending, attempt, absorb, settled]);
 
-  return receive;
+  return { receive, saveError };
 }

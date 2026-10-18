@@ -119,6 +119,14 @@
   white-space: nowrap;
 }
 
+/* what the row cut, said whole: it wraps, even inside a long word */
+.row-sheet-detail {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
 .row-sheet-item {
   display: flex;
   align-items: center;

@@ -34,6 +34,7 @@ import { DEFAULT_PORT } from "../shared/protocol.ts";
 import type { RemoteAccess } from "../shared/protocol.ts";
 import { canBind, FALLBACK_PORTS, freePort, savedPort } from "./plugin-port.ts";
 import { activePluginScript } from "./plugin-runtime.ts";
+import { herdrStateDir } from "./plugin-state.ts";
 import { parseTailscale, parseTailscaleIp, parseTailscaleOwner, readTailscale, tailscaleBinary } from "../server/tailscale.ts";
 import { descendantProcesses, windowsArgv, windowsProcessTable } from "../server/windows-processes.ts";
 
@@ -44,7 +45,12 @@ import { descendantProcesses, windowsArgv, windowsProcessTable } from "../server
  */
 const ENV_FILES = ["env", ".env"];
 const ROOT = resolve(process.env["HERDR_PLUGIN_ROOT"] ?? join(import.meta.dir, ".."));
-const STATE_DIR = process.env["HERDR_PLUGIN_STATE_DIR"] ?? join(homedir(), ".local", "state", "herdr-web-ui");
+const DEFAULT_STATE_DIR = join(homedir(), ".local", "state", "herdr-web-ui");
+const MANAGED_STATE_DIR = join(herdrStateDir(process.env, platform(), homedir()), "plugins", "devswha.herdr-web-ui");
+// run by hand, without herdr's HERDR_PLUGIN_STATE_DIR: a server started from a checkout keeps its
+// own dir while it runs; otherwise the dir herdr gives the plugin, where its startup hook wrote
+const STATE_DIR = process.env["HERDR_PLUGIN_STATE_DIR"]
+  ?? (readOwnerLauncher(join(DEFAULT_STATE_DIR, "server.pid")) !== null || pidIn(join(DEFAULT_STATE_DIR, "server.pid")) !== null || !existsSync(MANAGED_STATE_DIR) ? DEFAULT_STATE_DIR : MANAGED_STATE_DIR);
 const CONFIG_DIR = process.env["HERDR_PLUGIN_CONFIG_DIR"] ?? herdrConfigDir() ?? join(homedir(), ".config", "herdr-web-ui");
 const PID_FILE = join(STATE_DIR, "server.pid");
 const LOG_FILE = join(STATE_DIR, "server.log");
@@ -96,6 +102,8 @@ const fileVars = CONFIG_FILES.map(readEnvFile);
 /** keys both files set to different values: `.env` wins, which someone editing `env` would not expect */
 const shadowed = fileVars.length === 2 ? Object.keys(fileVars[0]!).filter((key) => key in fileVars[1]! && fileVars[0]![key] !== fileVars[1]![key]) : [];
 const env = { ...process.env, ...Object.assign({}, ...fileVars) as Record<string, string> };
+/** HERDR_SOCKET the user put in the config files: it names the session to show, so herdr's own socket does not replace it */
+const configuredSocket = fileVars.some((vars) => (vars["HERDR_SOCKET"] ?? "") !== "");
 const ownerMode = ownerStartupRequired(env);
 const PATH_KEY = platform() === "win32" ? Object.keys(env).sort().find(key => key.toLowerCase() === "path") ?? "PATH" : "PATH";
 /** the app's own state, as the server finds it (server/update-state.ts): the same path with or without herdr's env */
@@ -182,8 +190,13 @@ async function healthError(): Promise<string | null> {
 
 function recordedPid(): number | null {
   if (ownerMode) return readOwnerLauncher(PID_FILE)?.pid ?? null;
-  if (!existsSync(PID_FILE)) return null;
-  const pid = Number(readFileSync(PID_FILE, "utf8").trim());
+  return pidIn(PID_FILE);
+}
+
+/** the live process a pid file names, or null */
+function pidIn(file: string): number | null {
+  if (!existsSync(file)) return null;
+  const pid = Number(readFileSync(file, "utf8").trim());
   if (!Number.isInteger(pid) || pid <= 0) return null;
   try {
     process.kill(pid, 0);
@@ -192,6 +205,7 @@ function recordedPid(): number | null {
     return null;
   }
 }
+
 
 /** names the keys only, never their values: a token must not reach herdr's log */
 function warnShadowed(): void {
@@ -271,7 +285,7 @@ const serverEnv = (extra: Record<string, string> = {}): Record<string, string | 
   ...extra,
   // herdr hands the plugin HERDR_SOCKET_PATH; the server (and the attach it
   // spawns) reads HERDR_SOCKET
-  ...(env["HERDR_SOCKET_PATH"] !== undefined ? { HERDR_SOCKET: env["HERDR_SOCKET_PATH"] } : {}),
+  ...(env["HERDR_SOCKET_PATH"] !== undefined && !configuredSocket ? { HERDR_SOCKET: env["HERDR_SOCKET_PATH"] } : {}),
 });
 
 /**
