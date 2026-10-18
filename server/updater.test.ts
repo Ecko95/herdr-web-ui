@@ -57,6 +57,7 @@ async function managedFixture(supervisor?: string, slowHealth = false) {
   mkdirSync(join(upstream, "server"), { recursive: true });
   const entry = `
     import { createServer } from ${JSON.stringify(join(import.meta.dir, "index.ts"))};
+    import { syntheticServerOptions } from ${JSON.stringify(join(import.meta.dir, "../scripts/motoko-env.ts"))};
     import { connectUpdater } from ${JSON.stringify(join(import.meta.dir, "update-api.ts"))};
     ${slowHealth ? `
     // a busy PC: the bridge answers, but its first six health checks outlast the supervisor's 1 s probe
@@ -67,7 +68,7 @@ async function managedFixture(supervisor?: string, slowHealth = false) {
       if (new URL(request.url).pathname === "/api/health" && slow-- > 0) await Bun.sleep(1200);
       return options.fetch.call(this, request, server);
     } });` : ""}
-    const server = createServer({ updates: connectUpdater() });
+    const server = createServer({ ...syntheticServerOptions(${JSON.stringify(directory)}), stateDir: process.env.HERDR_WEB_STATE_DIR, port: Number(process.env.PORT), updates: connectUpdater() });
     process.on('SIGTERM', () => { server.stop(); setTimeout(() => process.exit(0), 50); });
     process.on('disconnect', () => { server.stop(); process.exit(0); });
   `;

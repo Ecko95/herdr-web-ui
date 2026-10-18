@@ -1,0 +1,14 @@
+{
+  "sampledAgoMs": 840000,
+  "staleAfterMs": 120000,
+  "rigs": [
+    {
+      "id": "sample-stale", "name": "sample-stale", "domain": "personal",
+      "seats": [
+        { "id": "a", "session": "a@sample-stale", "role": "builder", "runtime": "codex", "activity": "working", "confidence": "stale",
+          "context": { "used": 1000, "window": 200000, "observedAgoMs": 840000 }, "compactionReceipts": [] }
+      ]
+    }
+  ],
+  "needsYou": []
+}

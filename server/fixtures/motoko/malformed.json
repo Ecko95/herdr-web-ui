@@ -1,0 +1,25 @@
+{
+  "sampledAgoMs": 1000,
+  "staleAfterMs": 120000,
+  "rigs": [
+    { "id": "Bad Rig!", "name": "x", "domain": "personal", "seats": [] },
+    {
+      "id": "sample-mixed", "name": "sample-mixed", "domain": "personal",
+      "seats": [
+        { "id": "ok", "session": "ok@sample-mixed", "role": "builder", "runtime": "codex", "activity": "working", "confidence": "oracle",
+          "context": { "used": 1000, "window": 200000, "observedAgoMs": 1000 }, "compactionReceipts": [] },
+        { "id": "neg", "session": "neg@sample-mixed", "role": "builder", "runtime": "codex", "activity": "working", "confidence": "oracle",
+          "context": { "used": -5, "window": 200000, "observedAgoMs": 1000 }, "compactionReceipts": [] },
+        { "id": "act", "session": "act@sample-mixed", "role": "builder", "runtime": "codex", "activity": "dancing", "confidence": "oracle",
+          "context": { "used": 1, "window": 2, "observedAgoMs": 1 }, "compactionReceipts": [] },
+        { "id": "rcpt", "session": "rcpt@sample-mixed", "role": "builder", "runtime": "codex", "activity": "idle", "confidence": "oracle",
+          "context": { "used": 1, "window": 2, "observedAgoMs": 1 }, "compactionReceipts": "three" }
+      ]
+    }
+  ],
+  "needsYou": [
+    { "id": "ny-ok", "rigId": "sample-mixed", "seatId": "ok", "summary": "<img src=x onerror=alert(1)> literal text", "sinceAgoMs": 1000 },
+    { "id": "ny-orphan", "rigId": "sample-mixed", "seatId": "missing", "summary": "for a seat not on the roster", "sinceAgoMs": 1000 },
+    { "id": "ny-bad", "rigId": "sample-mixed", "seatId": "ok", "summary": 42, "sinceAgoMs": 1000 }
+  ]
+}

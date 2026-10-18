@@ -367,7 +367,7 @@ function voiceError(error: unknown): Response {
   return errorResponse(error);
 }
 
-export async function handleVoiceRequest(request: Request, pathname: string, service: VoiceService): Promise<Response> {
+export async function handleVoiceRequest(request: Request, pathname: string, service: VoiceService, signal: AbortSignal = request.signal): Promise<Response> {
   const noStore = { "cache-control": "no-store" };
   if (pathname === "/api/voice") {
     if (request.method !== "GET") return jsonResponse({ error: { code: "method_not_allowed", message: "Use GET /api/voice" } }, 405, { allow: "GET" });
@@ -377,7 +377,7 @@ export async function handleVoiceRequest(request: Request, pathname: string, ser
     if (request.method !== "PUT") return jsonResponse({ error: { code: "method_not_allowed", message: "Use PUT /api/voice/config" } }, 405, { allow: "PUT" });
     let body: unknown;
     try { body = await request.json(); } catch { return voiceError(invalid("Send a JSON object")); }
-    try { return jsonResponse(service.update(body), 200, noStore); } catch (error) { return voiceError(error); }
+    try { if (signal.aborted) throw invalid("Request canceled"); return jsonResponse(service.update(body), 200, noStore); } catch (error) { return voiceError(error); }
   }
   if (pathname === "/api/voice/transcribe") {
     if (request.method !== "POST") return jsonResponse({ error: { code: "method_not_allowed", message: "Use POST /api/voice/transcribe" } }, 405, { allow: "POST" });
@@ -390,7 +390,8 @@ export async function handleVoiceRequest(request: Request, pathname: string, ser
       let form: FormData;
       try { form = await new Response(body, { headers: { "content-type": request.headers.get("content-type") ?? "" } }).formData(); }
       catch { throw invalid("Send the recording as multipart/form-data"); }
-      const stream = await service.transcribe(parseClip(form), request.signal);
+      if (signal.aborted) throw invalid("Request canceled");
+      const stream = await service.transcribe(parseClip(form), signal);
       return new Response(stream, { status: 200, headers: { "content-type": "application/x-ndjson; charset=utf-8", ...noStore } });
     } catch (error) {
       return voiceError(error);

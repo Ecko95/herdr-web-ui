@@ -2,6 +2,7 @@
  * The address says where the app is, so any moment can be linked to and returned to:
  *
  *   ?machine=<pc>&ws=<id>-<slug>&pane=<pane>&view=chat|terminal&file=<path>&settings=<page>&section=<group>
+ *   &page=motoko
  *   ?new=workspace|tab&cwd=<folder>&name=<name>&agent=<kind>
  *   &sidebar=hidden|shown
  *
@@ -43,6 +44,8 @@ export interface AppLink {
   create?: CreateDraft | null;
   /** the sidebar, when not as the screen opens it: collapsed on a desktop, out on a phone */
   sidebar?: "shown" | "hidden" | null;
+  /** a page over the pane area: Motoko, the owner's view of rigs (components/Motoko.tsx) */
+  page?: "motoko" | null;
 }
 
 export interface CreateDraft {
@@ -60,7 +63,7 @@ const AGENT_KIND = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 
 const LOCAL = "local";
 /** the query names this module owns; anything else in the address is left as it is */
-const OWN = ["machine", "ws", "pane", "view", "file", "settings", "section", "new", "cwd", "name", "agent", "sidebar"] as const;
+const OWN = ["machine", "ws", "pane", "view", "file", "settings", "section", "new", "cwd", "name", "agent", "sidebar", "page"] as const;
 const SIDEBAR: Readonly<Record<string, "shown" | "hidden">> = { shown: "shown", show: "shown", open: "shown", "1": "shown", hidden: "hidden", hide: "hidden", closed: "hidden", "0": "hidden" };
 /** a slug stays this short, cut at a word where it can be: a link names the workspace, it does not spell it out */
 const SLUG_MAX = 24;
@@ -103,6 +106,7 @@ export function readLink(search: string): AppLink {
     section: settings ? named(query.get("section")) : null,
     create: readCreate(query),
     sidebar: SIDEBAR[query.get("sidebar") ?? ""] ?? null,
+    page: query.get("page") === "motoko" ? "motoko" : null,
   };
 }
 
@@ -133,6 +137,7 @@ export function linkSearch(link: AppLink, current = ""): string {
   if (link.settings) query.set("settings", link.settings);
   if (link.settings && link.section) query.set("section", link.section);
   if (link.sidebar) query.set("sidebar", link.sidebar);
+  if (link.page) query.set("page", link.page);
   if (link.create) {
     query.set("new", link.create.kind);
     if (link.create.cwd) query.set("cwd", link.create.cwd);

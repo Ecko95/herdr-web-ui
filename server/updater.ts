@@ -49,16 +49,18 @@ function packageVersion(directory: string): string | null {
 }
 
 /** Commands use argv, bounded output/time, and a separate group for cancellation. */
-export function runCommand(cwd: string, argv: string[], signal?: AbortSignal, timeout = 30_000): Promise<string> {
+export function runCommand(cwd: string, argv: string[], signal?: AbortSignal, timeout = 30_000, deps: { spawn?: typeof spawn; kill?: typeof process.kill } = {}): Promise<string> {
+  const kill = deps.kill ?? process.kill.bind(process);
   return new Promise((resolve, reject) => {
-    const child = spawn(argv[0]!, argv.slice(1), {
+    const child = (deps.spawn ?? spawn)(argv[0]!, argv.slice(1), {
       cwd, detached: true, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" },
     });
     let output = "", errors = "", failure: string | null = null;
     const cancel = (reason: string) => {
       failure = reason;
-      if (child.pid) { try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); } }
+      // a reaped leader's group ID can belong to other processes: signal only while the leader has not exited
+      if (child.pid && child.exitCode === null && child.signalCode === null) { try { kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); } }
     };
     const abort = () => cancel("Update cancelled");
     const timer = setTimeout(() => cancel(`${argv[0]} timed out`), timeout);

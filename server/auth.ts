@@ -85,13 +85,15 @@ export function bearerMatches(request: Request, token: string): boolean {
 }
 
 /** /api/health, /api/auth and /api/devices/pair stay open so a client can discover the gate and pass it. */
-export function requiresAuth(pathname: string): boolean {
+export function requiresAuth(pathname: string, ownerMode = false): boolean {
+  if (ownerMode && ["/api/owner/sign-in/options", "/api/owner/sign-in", "/api/owner/bootstrap/options", "/api/owner/register", "/api/owner/prove", "/api/owner/sign-out"].includes(pathname)) return false;
   if (pathname === "/ws") return true;
   if (!pathname.startsWith("/api/")) return false;
   return pathname !== "/api/health" && pathname !== "/api/auth" && pathname !== "/api/devices/pair";
 }
 
-export function unauthorizedJson(reason: "other_user" | "pairing_required" | "token_required" = "token_required"): Response {
+export function unauthorizedJson(reason: "other_user" | "pairing_required" | "token_required" | "owner_required" | "owner_store_unavailable" = "token_required"): Response {
+  if (reason === "owner_required" || reason === "owner_store_unavailable") return jsonResponse({ error: { code: reason, message: reason } }, reason === "owner_store_unavailable" ? 503 : 401);
   if (reason === "other_user") return jsonResponse({ error: { code: "other_user", message: "this PC belongs to another Tailscale user" } }, 403);
   return jsonResponse({ error: { code: "unauthorized", message: reason === "pairing_required" ? "pair this device, or use the token" : "token required" } }, 401);
 }
@@ -273,8 +275,9 @@ export function forgetAuthAttempts(): void {
   admitted.clear();
 }
 
-export async function handleAuthRequest(request: Request, token: string, client: string | null = null): Promise<Response> {
+export async function handleAuthRequest(request: Request, token: string, client: string | null = null, ownerSignOut?: () => Response): Promise<Response> {
   if (request.method === "DELETE") {
+    if (ownerSignOut) return ownerSignOut();
     // signing out drops both credentials this browser may hold
     return noContent(`${TOKEN_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`, `${DEVICE_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
   }
@@ -306,3 +309,9 @@ export async function handleAuthRequest(request: Request, token: string, client:
   admit(client);
   return noContent(sessionCookie(token, isSecureRequest(request)));
 }
+
+export function enrollmentWait(client: string | null): Response | null {
+  const wait = waitLeft("sign-in", client);
+  return wait > 0 ? tooManyAttempts(wait) : null;
+}
+export function recordEnrollmentFailure(client: string | null): void { recordFailure("sign-in", client); }
