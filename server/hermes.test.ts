@@ -24,8 +24,18 @@ import { toolSummary } from "./transcript-records.ts";
 
 describe("hermes paths", () => {
   it("computes default hermes home and db path", () => {
-    expect(defaultHermesHome("/test/home")).toBe("/test/home/.hermes");
-    expect(hermesDbPath("/test/home/.hermes")).toBe("/test/home/.hermes/state.db");
+    const previous = process.env["HERMES_HOME"];
+    try {
+      delete process.env["HERMES_HOME"];
+      expect(defaultHermesHome("/test/home")).toBe("/test/home/.hermes");
+      expect(hermesDbPath("/test/home/.hermes")).toBe("/test/home/.hermes/state.db");
+      process.env["HERMES_HOME"] = "/test/override";
+      expect(defaultHermesHome("/test/home")).toBe("/test/override");
+      expect(hermesDbPath()).toBe("/test/override/state.db");
+    } finally {
+      if (previous === undefined) delete process.env["HERMES_HOME"];
+      else process.env["HERMES_HOME"] = previous;
+    }
   });
 });
 

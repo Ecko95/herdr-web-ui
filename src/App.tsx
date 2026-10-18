@@ -1,7 +1,7 @@
 import { type CSSProperties, type DragEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Bell, Ellipsis, FolderOpen, Link, Menu, MessageSquare, PanelLeft, Search, SquareTerminal, X } from "lucide-react";
+import { Bell, Ellipsis, FolderOpen, Link, Menu, MessageSquare, PanelLeft, Search, ShieldCheck, SquareTerminal, X } from "lucide-react";
 
-import type { AgentStatus, ServerMessage, AccessRefusal, HealthAuth, HerdrPane } from "../shared/protocol.ts";
+import type { AgentStatus, ServerMessage, HerdrPane } from "../shared/protocol.ts";
 import { ApiError, authenticate, createTab, fetchHealth, fetchBridgeHealth, fetchMachines, fetchSession, pairDevice, routeMissing, sendTestPush, signOut, splitPane, zoomPane, type HealthInfo } from "./lib/api.ts";
 import { deviceLabel, takePairCode } from "./lib/phone.ts";
 import { alertPaneTitle, displayPaneTitle } from "./components/Sidebar.tsx";
@@ -11,6 +11,8 @@ import { PaneTerminal } from "./components/PaneTerminal.tsx";
 import { PANE_TABPANEL_ID, paneTabPanelLabel } from "./lib/paneRegion.ts";
 import { worktreeRepoName } from "./lib/composerStrip.ts";
 import { AccessGate } from "./components/AccessGate.tsx";
+import { Motoko } from "./components/Motoko.tsx";
+import { ownerMode, ownerSignOut, type GateReason, type OwnerAuth } from "./lib/motoko.ts";
 import { AgentMark } from "./components/AgentMark.tsx";
 import { NewSessionDialog, type NewTabTarget } from "./components/NewSessionDialog.tsx";
 import { passingFolder, recentDirectories } from "./lib/recent-directories.ts";
@@ -271,12 +273,14 @@ export function App() {
   // null until the server has said whether it wants a token: the shell, and with it
   // the WebSocket, never mounts before that is known
   const [locked, setLocked] = useState<boolean | null>(null);
-  const [lockReason, setLockReason] = useState<AccessRefusal | null>(null);
+  const [lockReason, setLockReason] = useState<GateReason | null>(null);
   /** the code a scanned QR brought along (`?pair=CODE`), taken off the address at once */
   const [pairCode] = useState(() => takePairCode());
-  const [auth, setAuth] = useState<HealthAuth | null>(null);
+  const [auth, setAuth] = useState<OwnerAuth | null>(null);
   // a token a proxy sends with every request comes back right after signing out: signing out is the proxy's
-  const canSignOut = auth?.authenticated === true && (auth.via === "device" || (auth.via === "token" && auth.bearer !== true));
+  const canSignOut = auth?.authenticated === true && (auth.via === "device" || (auth.via === "token" && auth.bearer !== true) || ownerMode(auth));
+  // Motoko over the pane area (`?page=motoko`): only where the server runs the owner gate
+  const [motokoOpen, setMotokoOpen] = useState(() => initialLink?.page === "motoko");
   // a device that is in only because nothing is paired yet still pairs from the QR code's address
   const pairedFromAddress = useRef(false);
   useEffect(() => {
@@ -804,14 +808,16 @@ export function App() {
     await removePushSubscription().catch(() => undefined);
     setPushOn(false);
     try {
-      await signOut();
+      // the owner session is ended on the server, not only its cookie (server/motoko-owner.ts)
+      if (ownerMode(auth)) await ownerSignOut();
+      else await signOut();
     } catch {
       throw new Error(t("Could not sign out. Try again."));
     } finally {
       // The response may have been lost after the cookie was cleared.
       await loadHealth();
     }
-  }, [loadHealth, t]);
+  }, [auth, loadHealth, t]);
 
   const selectedMachineRef = useRef(selectedMachineId);
   selectedMachineRef.current = selectedMachineId;
@@ -1194,6 +1200,7 @@ export function App() {
       machine: selectedMachineId, workspace: linkWorkspaceId, workspaceSlug: linkSlug, pane: selectedPaneId, view: selectedPaneId ? view : null, file: linkFile,
       settings: settingsOpen ? settingsPage : null, section: settingsOpen && settingsPage === settingsLinkPage ? settingsLinkSection : null,
       sidebar: wideScreen && sidebarCollapsed ? "hidden" : null,
+      page: motokoOpen ? "motoko" : null,
       create: newSessionOpen ? { kind: newTab ? "tab" : "workspace", cwd: newFields?.cwd ?? null, name: newFields?.name ?? null, agent: newFields?.agent ?? null } : null,
     };
     const previous = writtenLink.current;
@@ -1209,7 +1216,7 @@ export function App() {
       if (fileLeft) window.history.replaceState({ [NAV_KEY]: true }, "", url);
       else window.history.pushState({ [NAV_KEY]: true }, "", url);
     } else window.history.replaceState(window.history.state, "", url);
-  }, [locked, machines.length, snapshot, linkLanded, selectedMachineId, selectedPaneId, linkWorkspaceId, linkSlug, linkFile, fileLeft, view, settingsOpen, settingsPage, settingsLinkPage, settingsLinkSection, newSessionOpen, newTab, newFields, wideScreen, sidebarCollapsed, autoSelected]);
+  }, [locked, machines.length, snapshot, linkLanded, selectedMachineId, selectedPaneId, linkWorkspaceId, linkSlug, linkFile, fileLeft, view, settingsOpen, settingsPage, settingsLinkPage, settingsLinkSection, newSessionOpen, newTab, newFields, wideScreen, sidebarCollapsed, autoSelected, motokoOpen]);
 
 
   // a file a link named opens over its pane once the pane is shown, as the chat's file links do
@@ -1469,6 +1476,7 @@ export function App() {
     ...(selectedPane && !wideScreen ? [{ id: "files", label: t("Browse files"), icon: FolderOpen, run: () => setFilesOpen(true) }] : []),
     // the address says where the app is (lib/deepLink.ts); a phone has no address bar to copy it from
     { id: "copy-link", label: t("Copy link"), icon: Link, run: () => void copyText(window.location.href).then((ok) => { if (ok) setHeaderNote("copied"); }) },
+    ...(ownerMode(auth) && auth?.authenticated ? [{ id: "motoko", label: "Motoko", icon: ShieldCheck, run: () => { setDrawerOpen(false); setMotokoOpen(true); } }] : []),
     ...(bellVisible ? [{ id: "alerts", label: t("Alerts"), hint: bell.state, checked: bell.on, title: bell.title, icon: Bell, run: () => void bell.run() }] : []),
   ];
 
@@ -1500,7 +1508,7 @@ export function App() {
       </div>
     );
   }
-  if (locked) return <AccessGate reason={lockReason} initialCode={pairCode} onUnlocked={unlock} />;
+  if (locked) return <AccessGate reason={lockReason} initialCode={pairCode} ownerEnrolled={auth?.owner?.enrolled} onUnlocked={unlock} />;
 
   return (
     <MachineSessionsProvider machineIds={machines.map((machine) => machine.id)}><MachineContext.Provider value={selectedMachineId}><div className={`app${sidebarCollapsed ? " sidebar-collapsed" : ""}`} style={sidebarWidth === null && filePanelWidth === null ? undefined : {
@@ -1773,6 +1781,8 @@ export function App() {
             );
           })}
           <SplitDropPreview visible={splitDragOn && (paneDragging || tabDrag !== null)} side={dropAt} />
+          {/* last, so it is drawn over the panes, which stay mounted under it */}
+          {motokoOpen && <Motoko auth={auth} onClose={() => setMotokoOpen(false)} onSignOut={lock} onSessionEnded={() => void loadHealth()} />}
         </div>
         </div>
         </WebPanelContext.Provider>

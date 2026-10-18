@@ -1,11 +1,12 @@
 import { expect, it } from "bun:test";
 import { OUTPUT_STALLED_CLOSE_CODE } from "../../shared/terminal-flow.ts";
+import type { OwnerStore } from "../motoko-owner.ts";
 import type { DeviceStore } from "../devices.ts";
 import type { MachineRelay } from "../machine-relay.ts";
 import type { PendingInputs } from "../pending-input.ts";
 import { type Client, connectionData, connectionOf, createConnections, send } from "./connections.ts";
 
-function harness({ deviceId, readOnly = false, relay, revokedAlready = false }: { deviceId?: string; readOnly?: boolean; relay?: MachineRelay; revokedAlready?: boolean } = {}) {
+function harness({ deviceId, readOnly = false, relay, revokedAlready = false, owner, ownerSessionId }: { deviceId?: string; readOnly?: boolean; relay?: MachineRelay; revokedAlready?: boolean; owner?: OwnerStore; ownerSessionId?: string } = {}) {
   const log: string[] = [];
   const revocations: (() => void)[] = [];
   const devices = {
@@ -16,7 +17,7 @@ function harness({ deviceId, readOnly = false, relay, revokedAlready = false }: 
   } as unknown as DeviceStore;
   const pending = { close: () => log.push("pending closed") } as unknown as PendingInputs<Client, never>;
   const client = {
-    data: connectionData({ deviceId, readOnly, ...(relay ? { relay } : {}) }),
+    data: connectionData({ deviceId, readOnly, ownerSessionId, ...(relay ? { relay } : {}) }),
     close: (code: number, reason: string) => log.push(`closed ${code} ${reason}`),
     getBufferedAmount: () => 0,
     send: () => 1,
@@ -24,7 +25,7 @@ function harness({ deviceId, readOnly = false, relay, revokedAlready = false }: 
   const clients = new Set<Client>([client]);
   const present = new Set<Client>([client]);
   const connections = createConnections({
-    clients, present, pending, devices,
+    clients, present, pending, devices, owner,
     detachClaimed: () => log.push("detach claimed"),
     dropClaims: () => log.push("drop claims"),
   });
@@ -83,4 +84,22 @@ it("counts each change of role, and a read-only connection only watches", () => 
   const watcher = harness({ readOnly: true });
   expect(connectionOf(watcher.client).mode).toBe("observe");
   expect(() => watcher.authorizeSocket(watcher.client)).toThrow("this connection can only watch");
+});
+
+it("owner expiry refuses queued writes and revocation uses upstream teardown", () => {
+  let valid = true, revoke = () => {};
+  const owner = {
+    current: () => valid ? { id: "fiction-owner" } : null,
+    onRevoke: (_id: string, close: () => void) => { revoke = close; return () => {}; },
+  } as unknown as OwnerStore;
+  const { client, clients, present, admit, mayType, authorizeSocket, end } = harness({ owner, ownerSessionId: "fiction-owner" });
+  expect(admit(client)).toBe(true);
+  expect(mayType(client)).toBe(true);
+  valid = false;
+  expect(mayType(client)).toBe(false);
+  expect(() => authorizeSocket(client)).toThrow("Owner access revoked");
+  revoke();
+  expect(clients.has(client) || present.has(client)).toBe(false);
+  expect(connectionOf(client).closing).toBe(true);
+  end(client, "closed");
 });

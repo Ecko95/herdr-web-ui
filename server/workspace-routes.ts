@@ -3,6 +3,7 @@
  * workspaces, tabs and worktrees herdr makes, renames, moves and closes. They answer from herdr
  * and the disk; the dispatcher in index.ts runs the access gate first.
  */
+import { OwnerError, ownerError } from "./motoko-owner.ts";
 import type { Server } from "bun";
 import { statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -12,7 +13,7 @@ import type { DirectoryCreated, ServerMessage, TabMoved } from "../shared/protoc
 import { agentFault, agentLaunch, type AgentPayload } from "./agent-launch.ts";
 import { createDirectory, listDirectories } from "./directories.ts";
 import { HerdrError, tabClose, tabCreate, tabMove, tabRename, workspaceClose, workspaceCreate, workspaceMove, workspaceRename, worktreeCreate, worktreeList, worktreeOpen, worktreeRemove } from "./herdr/client.ts";
-import { badRequest, conflictResponse, errorResponse, isJsonObject, jsonResponse, readJsonObject } from "./http.ts";
+import { badRequest, conflictResponse, errorResponse as defaultErrorResponse, isJsonObject, jsonResponse, readJsonObject } from "./http.ts";
 import { paneContext } from "./pane-routes.ts";
 import { repoDiffResponse } from "./repo-diff.ts";
 
@@ -25,14 +26,16 @@ function expandedDirectory(value: string): string | null {
   }
 }
 
+function errorResponse(error: unknown): Response { return error instanceof OwnerError ? ownerError(error) : defaultErrorResponse(error); }
+
 /** The answer for a workspace route, or null when the path is not one. */
-export async function handleWorkspaceRequest(request: Request, url: URL, pathname: string, bunServer: Pick<Server<unknown>, "timeout">, broadcastAll: (message: ServerMessage) => void): Promise<Response | null> {
+export async function handleWorkspaceRequest(request: Request, url: URL, pathname: string, bunServer: Pick<Server<unknown>, "timeout">, broadcastAll: (message: ServerMessage) => void, checkOwner: () => void = () => {}): Promise<Response | null> {
   if (pathname === "/api/workspace/directories" && request.method === "POST") {
     let payload: unknown;
     try { payload = await request.json(); } catch { return badRequest("invalid_json", "request body must be JSON"); }
     if (!isJsonObject(payload) || typeof payload["path"] !== "string" || typeof payload["name"] !== "string") return badRequest("invalid_body", "path and name must be strings");
     let made;
-    try { made = createDirectory(payload["path"], payload["name"]); } catch (error) { return errorResponse(error); }
+    try { made = (checkOwner(), createDirectory(payload["path"], payload["name"])); } catch (error) { return errorResponse(error); }
     if ("path" in made) return jsonResponse({ path: made.path } satisfies DirectoryCreated, 201);
     if (made.error === "folder_exists") return conflictResponse("folder_exists", "a file or folder with that name is already there");
     if (made.error === "permission_denied") return jsonResponse({ error: { code: "permission_denied", message: "this user cannot make a folder there" } }, 403);
@@ -116,13 +119,13 @@ export async function handleWorkspaceRequest(request: Request, url: URL, pathnam
         ...(typeof payload.label === "string" ? { label: payload.label } : {}),
       };
       const created = inWorkspace
-        ? await tabCreate({ ...options, workspaceId: payload.workspace_id as string })
-        : await workspaceCreate(options);
+        ? await (checkOwner(), tabCreate({ ...options, workspaceId: payload.workspace_id as string }))
+        : await (checkOwner(), workspaceCreate(options));
       const workspaceId = created.tab.workspace_id;
       if (!payload.agent) {
         return jsonResponse({ workspace_id: workspaceId, pane_id: created.root_pane.pane_id, agent_started: false });
       }
-      return jsonResponse({ workspace_id: workspaceId, pane_id: created.root_pane.pane_id, ...(await agentLaunch(created.root_pane.pane_id, payload.agent)) });
+      return jsonResponse({ workspace_id: workspaceId, pane_id: created.root_pane.pane_id, ...(await (checkOwner(), agentLaunch(created.root_pane.pane_id, payload.agent))) });
     } catch (error) {
       return errorResponse(error);
     }
@@ -153,7 +156,7 @@ export async function handleWorkspaceRequest(request: Request, url: URL, pathnam
     // git can take a while to delete a large checkout; Bun's default idle timeout is shorter.
     bunServer.timeout(request, 75);
     try {
-      const removed = await worktreeRemove(payload.workspace_id, payload.force === true);
+      const removed = await (checkOwner(), worktreeRemove(payload.workspace_id, payload.force === true));
       // herdr closed the worktree's workspace: tell clients now, as the workspace close route does
       broadcastAll({ type: "session-changed" });
       return jsonResponse({ ok: true, path: removed.path, forced: removed.forced });
@@ -203,8 +206,8 @@ export async function handleWorkspaceRequest(request: Request, url: URL, pathnam
     try {
       const asked = payload.workspace_id;
       const from = (workspaceId: string) => creating
-        ? worktreeCreate({ workspaceId, branch: branch as string, base, label, path })
-        : worktreeOpen({ workspaceId, path, branch, label });
+        ? (checkOwner(), worktreeCreate({ workspaceId, branch: branch as string, base, label, path }))
+        : (checkOwner(), worktreeOpen({ workspaceId, path, branch, label }));
       // herdr starts a worktree only from the workspace on the repository's main checkout. Asked
       // from a workspace on another checkout (herdr does not mark one it did not open as a
       // worktree, so the row offers the action), the call goes to that workspace when it is open.
@@ -220,7 +223,7 @@ export async function handleWorkspaceRequest(request: Request, url: URL, pathnam
         already_open: opened.already_open === true,
         path: opened.worktree.path,
         branch: opened.worktree.branch,
-        ...(agent ? await agentLaunch(opened.root_pane.pane_id, agent) : {}),
+        ...(agent ? await (checkOwner(), agentLaunch(opened.root_pane.pane_id, agent)) : {}),
       });
     } catch (error) {
       // git's own words for a branch that has no commit yet (a folder just `git init`ed): with no
@@ -253,9 +256,9 @@ export async function handleWorkspaceRequest(request: Request, url: URL, pathnam
       return badRequest("invalid_index", "insert_index must be a non-negative integer");
     }
     try {
-      if (pathname === "/api/workspace/rename") await workspaceRename(payload.workspace_id, payload.label as string);
-      else if (pathname === "/api/workspace/move") await workspaceMove(payload.workspace_id, payload.insert_index as number);
-      else await workspaceClose(payload.workspace_id, undefined, payload.close_group === true);
+      if (pathname === "/api/workspace/rename") await (checkOwner(), workspaceRename(payload.workspace_id, payload.label as string));
+      else if (pathname === "/api/workspace/move") await (checkOwner(), workspaceMove(payload.workspace_id, payload.insert_index as number));
+      else await (checkOwner(), workspaceClose(payload.workspace_id, undefined, payload.close_group === true));
       // a closed workspace's panes send no exit: without this, clients learn of it only after
       // the collector's structure debounce, and the closed workspace stays on screen meanwhile
       if (pathname === "/api/workspace/close") broadcastAll({ type: "session-changed" });
@@ -276,7 +279,7 @@ export async function handleWorkspaceRequest(request: Request, url: URL, pathnam
     }
     try {
       if (pathname === "/api/tab/move") {
-        const moved = await tabMove(payload.tab_id, payload.insert_index as number);
+        const moved = await (checkOwner(), tabMove(payload.tab_id, payload.insert_index as number));
         broadcastAll({ type: "session-changed" });
         return jsonResponse({ ok: true, tabs: moved.tabs } satisfies TabMoved);
       }
@@ -285,12 +288,12 @@ export async function handleWorkspaceRequest(request: Request, url: URL, pathnam
         const label = typeof payload.label === "string" ? payload.label.trim() : "";
         if (label === "") return badRequest("missing_label", "label is required");
         if (label.length > MAX_LABEL_CHARS) return badRequest("label_too_long", `label must be at most ${MAX_LABEL_CHARS} characters`);
-        await tabRename(payload.tab_id, label);
+        await (checkOwner(), tabRename(payload.tab_id, label));
         // no pane event follows a rename, so the clients are told here
         broadcastAll({ type: "session-changed" });
       } else {
         // herdr emits pane.closed for the tab's panes, and the collector tells the clients
-        await tabClose(payload.tab_id);
+        await (checkOwner(), tabClose(payload.tab_id));
       }
       return jsonResponse({ ok: true });
     } catch (error) {

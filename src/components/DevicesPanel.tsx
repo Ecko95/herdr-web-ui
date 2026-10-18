@@ -21,12 +21,14 @@ export interface DevicesPanelProps {
   onPaired?: () => void;
 }
 
-export const VIA: Record<NonNullable<HealthAuth["via"]>, string> = {
+// "owner" is spelled here as well as in AccessVia: the owner gate (server/motoko-owner.ts) adds it there
+export const VIA: Record<NonNullable<HealthAuth["via"]> | "owner", string> = {
   local: "You are on the PC itself.",
   tailscale: "You are in as this PC's Tailscale login.",
   device: "This is a paired device.",
   token: "You are in with the access token.",
   open: "This browser is in only because nothing is paired yet: from anywhere that can reach this address, so would anyone.",
+  owner: "You are in with the owner's passkey.",
 };
 
 function lastSeen(value: string | null): string {
@@ -128,6 +130,14 @@ export function DevicesPanel({ pairUrl, auth, onPaired }: DevicesPanelProps) {
 
   const spaced = code ? `${code.code.slice(0, 3)} ${code.code.slice(3)}` : "";
   const qrValue = code && pairUrl ? `${pairUrl.replace(/\/$/, "")}/?pair=${code.code}` : null;
+
+  // the owner gate turns pairing and the token off: passkeys and sessions are in Motoko → Access
+  if ((auth?.via as string | undefined) === "owner") return (
+    <div className="devices-panel">
+      <p className="settings-description">{t(VIA.owner)}</p>
+      <p className="settings-hint">{t("Pairing codes and the access token are off while owner passkey sign-in is on. Manage passkeys and sessions in Motoko, under Access.")}</p>
+    </div>
+  );
 
   return (
     <div className="devices-panel">

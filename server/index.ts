@@ -1,3 +1,6 @@
+import { createOpenRigProvider } from "./motoko-reader.ts";
+import { OwnerError, OwnerStore, ownerConfiguration, ownerRequestAllowed, disabledOwnerRoute, ownerError, type OwnerConfig } from "./motoko-owner.ts";
+import { CoordinationError, createCoordination, curlQueue, rigSourceCheck, sourceBinding, type Coordination } from "./motoko-coordination.ts";
 import { handleWorkspaceRequest } from "./workspace-routes.ts";
 import { closeMention, createSubmitText, freeClaudeBox, freeHermesInput, InputDraftError, pendingFault, pendingIdentity, pendingText } from "./core/composer.ts";
 import { createInputLane } from "./core/input.ts";
@@ -17,7 +20,7 @@ import { cameThroughProxy, decideAccess, isLoopbackAddress, isLoopbackBind, isSe
 import { DeviceStore, handleDeviceRequest, type DeviceMatch } from "./devices.ts";
 import { handlePreferencesRequest, PreferenceStore } from "./preferences.ts";
 import { remoteAccess, TailnetIdentitySource } from "./tailscale.ts";
-import { badRequest, errorResponse, jsonResponse, readJsonObject } from "./http.ts";
+import { badRequest, errorResponse as defaultErrorResponse, jsonResponse, readJsonObject } from "./http.ts";
 import { requestOrigin, serveStatic } from "./static.ts";
 import { compressResponse } from "./compress.ts";
 import { isMouseReport, sameAttachment } from "./input-guard.ts";
@@ -253,8 +256,14 @@ export interface ServerInstance {
   stop: () => void;
 }
 
+function errorResponse(error: unknown): Response { return error instanceof OwnerError ? ownerError(error) : defaultErrorResponse(error); }
+
 export function createServer(
   options: {
+    owner?: OwnerConfig;
+    motokoProvider?: import("./motoko.ts").MotokoProvider;
+    /** Owner request coordination; tests pass one with a disposable queue. Unset, the environment binding decides. */
+    coordination?: Coordination | null;
     port?: number;
     hostname?: string;
     token?: string;
@@ -326,6 +335,17 @@ export function createServer(
     sidecar?: boolean;
   } = {},
 ): ServerInstance {
+  const ownerConfig = ownerConfiguration(options.owner);
+  const testOrigin = ownerConfig?.origin === "http://localhost:0";
+  if (testOrigin && (options.owner?.origin !== "http://localhost:0" || options.owner.rpId !== "localhost" || options.hostname !== "127.0.0.1" || options.port !== 0)) throw new Error("The test owner origin requires explicit loopback port zero");
+  let notifyOwnerFault = () => {};
+  const owner = ownerConfig ? new OwnerStore(ownerConfig, options.stateDir ?? defaultStateDir(), { onFault: () => notifyOwnerFault() }) : null;
+  const motokoEnv = { ...process.env };
+  const motokoProvider = options.motokoProvider ?? createOpenRigProvider(undefined, Date.now, motokoEnv);
+  // Owner requests to the orchestrator: enabled only by the exact registered source (HERDR_WEB_MOTOKO_SOURCE_SESSION)
+  // and its startup check; tests pass their own instance. Without owner mode there is no coordination at all.
+  const coordination: Promise<Coordination | null> = !owner ? Promise.resolve(null) : options.coordination !== undefined ? Promise.resolve(options.coordination)
+    : sourceBinding(motokoEnv, rigSourceCheck(motokoEnv)).then((binding) => createCoordination({ stateDir: options.stateDir ?? defaultStateDir(), binding, queue: curlQueue(), now: Date.now }));
   const attachments = new Map<string, PaneAttachment>();
   /** whether this bridge can `terminal attach`: herdr is asked once, and the PTY sidecar has to be runnable here (server/pty/sidecar.ts) */
   /** whether the sidecar can run, settled as the server starts so that attach, /api/health and /api/bridge tell one answer; a forced answer (tests) stands in for it */
@@ -401,7 +421,7 @@ export function createServer(
 
   const submitText = createSubmitText({ options, lastTyped, attachments, terminalAttach, SUBMIT_DEADLINE_MS, TYPED_SETTLE_MS, DRAFT_CLEAR_WAIT_MS, DRAFT_CLEAR_POLL_MS, SUBMIT_DELAY_MS });
 
-  const { mayType, authorizeSocket, admit, setRole, watchPane, unwatchPane, killWatches, end } = createConnections({ clients, present, pending, devices, detachClaimed, dropClaims });
+  const { mayType, authorizeSocket, admit, setRole, watchPane, unwatchPane, killWatches, end } = createConnections({ clients, present, pending, devices, detachClaimed, dropClaims, owner });
 
   function pendingLease(owner: Client, paneId: string): PendingLease {
     const attachment = attachments.get(paneId);
@@ -624,7 +644,7 @@ export function createServer(
       ...(window ? { flow: { stream_id: window.id, offset: window.write(bytes, wireBytes(data)) } } : {}),
     });
   }
-  const { push, omo, gjc, claudeAgents, plans, clientSnapshot, countVisit, machines, broadcastAll, logPushError, collector, waitTimer } = createStatusHub({ options, devices, clients, present, pending, drainPending, holdPendingPane, usage, usageLogin });
+  const { push, omo, gjc, claudeAgents, plans, clientSnapshot, countVisit, machines, broadcastAll, logPushError, collector, waitTimer } = createStatusHub({ options, devices, clients, present, pending, drainPending, holdPendingPane, usage, usageLogin, ownerMode: owner !== null });
   const bridgeToken = randomBytes(32).toString("hex");
 
   function broadcast(paneId: string, message: ServerMessage): void {
@@ -1130,7 +1150,28 @@ export function createServer(
       return compressResponse(request, await (async (): Promise<Response | undefined> => {
       const url = new URL(request.url);
       let { pathname } = url;
-      const bridgeAuthorized = isAuthenticated(request, bridgeToken);
+      const mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+      let ownerSession = owner?.match(request, mutating) ?? null;
+      if (!owner && (pathname.startsWith("/api/owner/") || pathname.startsWith("/api/motoko/"))) return jsonResponse({ error: { code: "owner_gate_required", message: "Owner mode is required" } }, 404);
+      if (owner && (pathname.startsWith("/api/") || pathname === "/ws")) {
+        if ((mutating || pathname === "/ws") && !ownerRequestAllowed(request, owner.config)) return jsonResponse({ error: { code: "invalid_origin", message: "Use owner controls from this origin" } }, 403);
+        if (disabledOwnerRoute(pathname, url, request.method)) return jsonResponse({ error: { code: "disabled_in_owner_mode", message: "This route is disabled in owner mode" } }, 403);
+        if (pathname === "/api/health" && !ownerSession) return owner.redactedHealth();
+        const handled = await owner.handle(request, url, { ip: bunServer.requestIP(request)?.address ?? "unknown", userAgent: request.headers.get("user-agent") ?? "", client: authClient(bunServer.requestIP(request)?.address ?? null, request.headers) });
+        if (handled) return handled;
+        if (pathname === "/api/auth" && request.method === "DELETE") { try { return handleAuthRequest(request, token, null, () => owner.signOut(request)); } catch (error) { return ownerError(error); } }
+        ownerSession = owner.match(request, mutating);
+        if (!ownerSession) return owner.denied();
+      }
+      const checkOwner = (): void => {
+        if (owner && ownerSession) owner.assertCurrent(ownerSession.id);
+      };
+      if (owner && ownerSession && mutating && request.headers.get("content-type")?.includes("application/json")) {
+        const body = await request.arrayBuffer();
+        if (!owner.current(ownerSession.id)) return owner.denied();
+        request = new Request(request, { body });
+      }
+      const bridgeAuthorized = !owner && isAuthenticated(request, bridgeToken);
       const bridgePath = pathname === "/api/bridge" || pathname === "/api/session" || pathname === "/api/agents" || pathname === "/api/agent/rename" || pathname === "/api/integrations" || pathname === "/api/plugins/actions" || pathname === "/api/plugin/action" || pathname.startsWith("/api/pane/") || pathname.startsWith("/api/workspace/") || pathname.startsWith("/api/worktree/") || pathname.startsWith("/api/tab/") || pathname === "/api/layout/ratio" || pathname.startsWith("/api/fs/") || pathname === "/ws";
       const ip = bunServer.requestIP(request);
       const loopback = ip !== null && isLoopbackAddress(ip.address);
@@ -1141,7 +1182,7 @@ export function createServer(
       const requestHost = request.headers.get("host");
       // the guessing budget of the address that asks (auth.ts): a token presented while it waits is not compared
       const client = authClient(ip?.address ?? null, request.headers);
-      const presented = presentedToken(request, token, client);
+      const presented = owner ? "none" : presentedToken(request, token, client);
       // counted at once, before any await below lets a concurrent guess pass the same check. Every
       // wrong token counts, a paired watch device's too (a right one would upgrade it to drive);
       // the connection server's own bridge token does not
@@ -1149,14 +1190,14 @@ export function createServer(
       const tokenMatched = presented === "match";
       let pairedDevice: DeviceMatch | null;
       try {
-        pairedDevice = devices.match(parseCookies(request.headers.get("cookie")).get(DEVICE_COOKIE));
+        pairedDevice = owner ? null : devices.match(parseCookies(request.headers.get("cookie")).get(DEVICE_COOKIE));
       } catch (error) {
         // First-cookie confirmation is an authorization write, not best-effort telemetry.
         return errorResponse(error);
       }
       const requestShape = { loopback, forwarded, funnel, tailscaleLogin, forwardedFor, serveOnly };
-      const identity = await identityOf(token === "" && pairedDevice === null && isServeOwnerRequest(requestShape) && (pathname === "/ws" || pathname.startsWith("/api/")), requestHost);
-      const access = decideAccess({
+      const identity = owner ? { soleLogin: null, dnsName: null, tailnetIp: null, owner: null, tagged: false } : await identityOf(token === "" && pairedDevice === null && isServeOwnerRequest(requestShape) && (pathname === "/ws" || pathname.startsWith("/api/")), requestHost);
+      const access = owner ? { level: "full" as const, via: "owner" as const, role: "drive" as const } : decideAccess({
         ...requestShape,
         host: requestHost,
         tokenMatched,
@@ -1167,16 +1208,25 @@ export function createServer(
       });
       const authenticated = access.level === "full" || (bridgePath && bridgeAuthorized);
 
-      if (requiresAuth(pathname) && !authenticated) {
+      if (requiresAuth(pathname, owner !== null) && !authenticated) {
         // a script's Bearer guess is told to wait; a browser's cookie gets the usual 401 and its sign-in form
         if (presented === "held" && pathname !== "/ws" && request.headers.has("authorization")) return presentedTokenHeld(client);
         // The WS client never parses a body, so the upgrade refusal stays plain text.
         return pathname === "/ws" ? new Response("unauthorized", { status: 401 }) : unauthorizedJson(access.level === "none" ? access.reason : "token_required");
       }
 
+      if (pathname.startsWith("/api/motoko/")) {
+        const { handleMotokoRequest } = await import("./motoko.ts");
+        if (owner && (!ownerSession || !owner.current(ownerSession.id))) return owner.denied();
+        const session = ownerSession;
+        // the owner proof is this server's own session check, never a body field or header the browser chose
+        const ownerContext = owner && session ? { sessionId: session.id, origin: owner.config.origin, recheck: () => {
+          try { owner.assertCurrent(session.id); } catch { throw new CoordinationError("owner_required", 401); }
+        } } : null;
+        return handleMotokoRequest(request, url, { provider: motokoProvider, now: Date.now, coordination: owner ? await coordination : null, owner: ownerContext });
+      }
       const readOnly = access.level === "full" && access.role === "watch";
-      const mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-      if (pathname.startsWith("/api/") && mutating && !sameOrigin(request)) {
+      if (pathname.startsWith("/api/") && mutating && !owner && !sameOrigin(request)) {
         return jsonResponse({ error: { code: "invalid_origin", message: "Use controls from this app" } }, 403);
       }
       // An empty segment ("//") reads as another route to the checks below, while the PC proxy
@@ -1215,7 +1265,7 @@ export function createServer(
           // a worktree made with an agent waits on git and then agent.start, up to 150 s on the PC
           bunServer.timeout(request, pathname === "/api/machines/events" ? 0 : pathname.endsWith("/worktree/create") ? 180 : 80);
           const deviceId = access.level === "full" ? access.device?.id : undefined;
-          const response = await handleMachineRequest(request, machines, deviceId ? (close) => devices.onRevoke(deviceId, close) : undefined, preferences, readOnly, herdrSidebar);
+          const response = await handleMachineRequest(request, machines, owner && ownerSession ? (close) => owner.onRevoke(ownerSession.id, close) : deviceId ? (close) => devices.onRevoke(deviceId, close) : undefined, preferences, readOnly, herdrSidebar);
           response.headers.set("cache-control", "no-store");
           return response;
         }
@@ -1224,7 +1274,7 @@ export function createServer(
       // in charge rather than Bun's default 10 s idle cutoff. PC proxies have their own budget above.
       if (pathname === "/api/pane/read" || pathname === "/api/pane/conversation") bunServer.timeout(request, 60);
       if (pathname === "/ws") {
-        if (!sameOrigin(request)) return new Response("invalid origin", { status: 403 });
+        if (!(owner ? ownerRequestAllowed(request, owner.config) : sameOrigin(request))) return new Response("invalid origin", { status: 403 });
         const deviceId = access.level === "full" ? access.device?.id : undefined;
         const machineId = url.searchParams.get("machine_id");
         if (machineId && machineId !== "local") {
@@ -1240,7 +1290,7 @@ export function createServer(
           } catch { relay?.close(); return new Response("remote websocket unavailable", { status: 502 }); }
           return new Response("websocket upgrade required", { status: 426 });
         }
-        const upgraded = bunServer.upgrade(request, { data: connectionData({ deviceId, readOnly }) });
+        const upgraded = bunServer.upgrade(request, { data: connectionData({ deviceId, readOnly, ownerSessionId: ownerSession?.id }) });
         if (upgraded) return undefined as unknown as Response;
         return new Response("websocket upgrade required", { status: 426 });
       }
@@ -1257,7 +1307,7 @@ export function createServer(
       }
       if (pathname === "/api/devices" || pathname.startsWith("/api/devices/")) {
         try {
-          const response = await handleDeviceRequest(request, pathname, devices, access);
+          const response = await (checkOwner(), handleDeviceRequest(request, pathname, devices, access));
           if (request.method === "DELETE" && response.status === 204) {
             // The device registry is the delivery authority even if cleaning the push file fails.
             try { push.revokeDevice(pathname.slice("/api/devices/".length)); } catch (error) { logPushError(error); }
@@ -1269,21 +1319,21 @@ export function createServer(
       }
 
       if (pathname === "/api/updates" || pathname.startsWith("/api/updates/")) {
-        return handleUpdateRequest(request, pathname, options.updates);
+        return (checkOwner(), handleUpdateRequest(request, pathname, options.updates));
       }
-      if (pathname === "/api/herdr/update") return handleHerdrUpdateRequest(request, options.herdrUpdate);
+      if (pathname === "/api/herdr/update") return (checkOwner(), handleHerdrUpdateRequest(request, options.herdrUpdate));
       if (pathname === "/api/portal" || pathname.startsWith("/api/portal/")) {
         return handlePortalRequest(request, pathname, options.portal, { port: bunServer.port ?? DEFAULT_PORT, tokenSet: token !== "", serveOnly });
       }
-      if (pathname === "/api/telemetry") return handleTelemetryRequest(request, options.telemetry);
+      if (pathname === "/api/telemetry") return (checkOwner(), handleTelemetryRequest(request, options.telemetry));
       // what every browser of this server shares; a watching device reads it and cannot change it (above)
-      if (pathname === "/api/preferences") return handlePreferencesRequest(request, preferences);
+      if (pathname === "/api/preferences") return (checkOwner(), handlePreferencesRequest(request, preferences));
 
-      if (pathname === "/api/usage") return handleUsageRequest(request, url, usage);
-      if (pathname === "/api/usage/login") { bunServer.timeout(request, 30); return usageLogin.handle(request, collector.trackPane); }
-      if (pathname === "/api/cliproxy" || pathname.startsWith("/api/cliproxy/")) { bunServer.timeout(request, 60); return cliProxyRoutes.handle(request); }
+      if (pathname === "/api/usage") return (checkOwner(), handleUsageRequest(request, url, usage));
+      if (pathname === "/api/usage/login") { bunServer.timeout(request, 30); return (checkOwner(), usageLogin.handle(request, collector.trackPane)); }
+      if (pathname === "/api/cliproxy" || pathname.startsWith("/api/cliproxy/")) { bunServer.timeout(request, 60); return (checkOwner(), cliProxyRoutes.handle(request)); }
       // a long clip can keep the provider silent past Bun's 10 s idle limit before the first line
-      if (pathname === "/api/voice" || pathname.startsWith("/api/voice/")) { bunServer.timeout(request, 120); return handleVoiceRequest(request, pathname, voice); }
+      if (pathname === "/api/voice" || pathname.startsWith("/api/voice/")) { bunServer.timeout(request, 120); return (checkOwner(), handleVoiceRequest(request, pathname, voice, ownerSession && owner ? AbortSignal.any([request.signal, owner.signal(ownerSession.id)]) : request.signal)); }
 
       if (pathname === "/api/push" || pathname.startsWith("/api/push/")) {
         try {
@@ -1291,7 +1341,7 @@ export function createServer(
           // it stays open, like a subscription from before owners (undefined); a local/token/
           // Tailscale sign-in is the owner (null)
           const owner = access.level !== "full" ? null : access.device?.id ?? (access.via === "open" ? undefined : null);
-          const answered = await handlePushRequest(request, pathname, push, owner);
+          const answered = await (checkOwner(), handlePushRequest(request, pathname, push, owner));
           if (answered) return answered;
         } catch (error) {
           return errorResponse(error);
@@ -1300,7 +1350,7 @@ export function createServer(
 
       if (pathname === "/api/health") {
         const auth: HealthAuth = access.level === "full"
-          ? { required: false, authenticated: true, via: access.via, role: access.role, ...(access.via === "token" && bearerMatches(request, token) ? { bearer: true as const } : {}) }
+          ? { required: owner !== null, authenticated: true, ...(owner ? { owner: { enrolled: owner.enrolled } } : {}), via: access.via, role: access.role, ...(access.via === "token" && bearerMatches(request, token) ? { bearer: true as const } : {}) }
           : { required: true, authenticated, ...(authenticated ? {} : { reason: access.reason }) };
         // this server is open to the network with no token and nothing paired, told to a client
         // that got in and to nobody else: naming it to an anonymous caller would be
@@ -1394,7 +1444,7 @@ export function createServer(
         return media ?? jsonResponse({ error: { code: "not_found", message: "no such page media" } }, 404);
       }
 
-      const workspaceResponse = await handleWorkspaceRequest(request, url, pathname, bunServer, broadcastAll);
+      const workspaceResponse = await handleWorkspaceRequest(request, url, pathname, bunServer, broadcastAll, checkOwner);
       if (workspaceResponse) return workspaceResponse;
 
       if (pathname === "/api/plugins/actions") {
@@ -1462,7 +1512,7 @@ export function createServer(
         }
       }
 
-      const paneResponse = await handlePaneRequest(request, url, pathname, options);
+      const paneResponse = await handlePaneRequest(request, url, pathname, options, checkOwner);
       if (paneResponse) return paneResponse;
 
       if (pathname === "/api/pane/omo-tasks") {
@@ -1511,7 +1561,7 @@ export function createServer(
 
       if (pathname.startsWith("/api/pane/prompt")) {
         try {
-          const response = await handlePromptRequest(request, url, { serialize, codexHome: options.codexHome, claudeTranscript: (paneId) => claudeAgents.sessionOf(paneId)?.path ?? null, readOnly });
+          const response = await (checkOwner(), handlePromptRequest(request, url, { serialize, codexHome: options.codexHome, claudeTranscript: (paneId) => claudeAgents.sessionOf(paneId)?.path ?? null, readOnly }));
           if (response) return response;
         } catch (error) {
           return errorResponse(error);
@@ -1524,7 +1574,7 @@ export function createServer(
 
       // static client - public even when the API is gated, so the login UI can load
       return serveStatic(pathname, request.headers.get("accept-encoding"), requestOrigin(request));
-      })());
+      })().catch((error: unknown) => { if (error instanceof OwnerError) return ownerError(error); throw error; }));
     },
 
     websocket: {
@@ -1550,6 +1600,7 @@ export function createServer(
 
       async message(client, raw) {
         if (stopped || connectionOf(client).closing) return;
+        if (owner && (!client.data.ownerSessionId || !owner.current(client.data.ownerSessionId))) { client.close(1008, "Owner access revoked"); return; }
         // read here for a relayed connection too: alerts for every PC go out from this server
         const presence = presenceOf(raw);
         if (presence === true) {
@@ -1566,6 +1617,9 @@ export function createServer(
           return;
         }
         try {
+          if (owner && client.data.ownerSessionId && ["input", "keys", "submit", "secret"].includes(message.type)) {
+            if (!owner.current(client.data.ownerSessionId, true)) { client.close(1008, "Owner access revoked"); return; }
+          }
           switch (message.type) {
             // liveness only: any role, no herdr call, nothing to wait behind
             case "ping": {
@@ -1994,9 +2048,9 @@ export function createServer(
                       await paneSendKeys(message.pane_id, ["Enter"], undefined, allowed);
                     } catch (error) {
                       if (!(error instanceof HerdrError && error.code === "cancelled")) throw error;
-                      // Cleanup is deliberately unguarded: do not leave the secret for another Enter.
+                      // Cleanup requires current authority, like the original secret write.
                       // Raw-mode readers may receive these bytes without erasing their own buffer.
-                      await paneSendKeys(message.pane_id, Array(message.secret.length).fill("Backspace"));
+                      await paneSendKeys(message.pane_id, Array(message.secret.length).fill("Backspace"), undefined, () => mayType(client));
                       result(false, connectionOf(client).closing || connectionOf(client).roles !== roles
                         ? "read_only" : "not_attached");
                       return;
@@ -2204,7 +2258,9 @@ export function createServer(
     },
   });
 
-  if (options.portal) {
+  if (testOrigin) owner!.resolveTestOrigin(server.port!);
+
+  if (!owner && options.portal) {
     let resume: Promise<void>;
     try {
       resume = options.portal.resume({ port: server.port ?? DEFAULT_PORT, tokenSet: token !== "", serveOnly });
@@ -2219,7 +2275,20 @@ export function createServer(
     settlePortalStartup({ ok: true });
   }
 
-  const registration = options.registerBridge ? registerBridge(server.port ?? 0, bridgeToken) : null;
+  const registration = !owner && options.registerBridge ? registerBridge(server.port ?? 0, bridgeToken) : null;
+
+  const privateBootId = process.env["HERDR_WEB_BOOT_ID"];
+  const privateManaged = owner !== null && process.env["HERDR_WEB_MANAGED"] === "1" && !!privateBootId && typeof process.send === "function";
+  let privateReady = false;
+  const reportPrivateReadiness = (status: "ready" | "failed") => {
+    try { process.send?.({ type: "bridge-ready", protocol: 1, owner: true, boot_id: privateBootId, port: server.port, status }); } catch { /* parent exited */ }
+  };
+  notifyOwnerFault = () => { if (privateManaged) { privateReady = false; reportPrivateReadiness("failed"); } };
+  if (privateManaged && owner!.fault) notifyOwnerFault();
+  else if (privateManaged) void collector.ready.then(async () => {
+    await ping();
+    if (!stopped) { privateReady = !owner!.fault; reportPrivateReadiness(privateReady ? "ready" : "failed"); }
+  }).catch(() => { if (!stopped) reportPrivateReadiness("failed"); });
 
   // ACKs can stop arriving entirely (a suspended tab). Bound the pause even then.
   const outputTimer = setInterval(() => {
@@ -2235,6 +2304,8 @@ export function createServer(
     alertsSettled: () => push.settled(),
     stop: () => {
       stopped = true;
+      if (privateManaged && privateReady) { privateReady = false; reportPrivateReadiness("failed"); }
+      owner?.close();
       settlePortalStartup({ ok: false, error: new Error("Server stopped before Portal startup cleanup completed") });
       conversations.stop();
       clearInterval(outputTimer);
@@ -2245,7 +2316,7 @@ export function createServer(
       clearInterval(waitTimer);
       plans.stop();
       machines?.stop();
-      void options.portal?.shutdown();
+      if (!owner) void options.portal?.shutdown();
       registration?.close();
       for (const client of clients) killWatches(client);
       for (const paneId of [...attachments.keys()]) closeAttachment(paneId);
@@ -2255,6 +2326,7 @@ export function createServer(
 }
 
 if (import.meta.main) {
+  try { ownerConfiguration(); } catch { console.error("Invalid owner configuration"); process.exit(1); }
   const updates = connectUpdater();
   const version = (JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")) as { version: string }).version;
   const telemetry = new Telemetry({ stateDir: defaultStateDir(), version, env: process.env, fetch, previousVersion: () => updates.installed().previous_version });

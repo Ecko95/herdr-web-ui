@@ -26,6 +26,7 @@ import type { UserError } from "../lib/userError.ts";
 import type { MachineSettings } from "../../shared/machines.ts";
 import { fetchRemoteAccess, fetchVoiceStatus, machineRequest, saveVoiceConfig } from "../lib/api.ts";
 import { isLoopbackHost, phonePlan } from "../lib/phone.ts";
+import { ownerMode } from "../lib/motoko.ts";
 import type { AgentIntegration, HealthAuth, PluginActions, RemoteAccess } from "../../shared/protocol.ts";
 import { useMachineApi, useMachineId } from "../lib/machineContext.tsx";
 import { loadIntegrations, outcomeFor, type IntegrationsResult } from "../lib/integrations.ts";
@@ -835,13 +836,16 @@ function DevicesPage({ auth, onSignOut }: { auth: HealthAuth | null; onSignOut: 
   const { settings, update } = useSettings();
   const t = useT();
   const installPrompt = useInstallPrompt();
+  // the owner gate turns pairing and the token off: a passkey is the only way back in, so the
+  // legacy phone sharing and Portal guidance (and their requests) stay out of owner mode
+  const owner = ownerMode(auth);
   // the server says what Tailscale on its PC already serves
   const [access, setAccess] = useState<RemoteAccess | null | undefined>(undefined);
   const loadAccess = useCallback(() => {
     setAccess(undefined);
     fetchRemoteAccess().then(setAccess, () => setAccess(null));
   }, []);
-  useEffect(() => { loadAccess(); }, [loadAccess]);
+  useEffect(() => { if (!owner) loadAccess(); }, [loadAccess, owner]);
   const plan = phonePlan({ protocol: window.location.protocol, hostname: window.location.hostname, origin: window.location.origin, secure: window.isSecureContext }, access ?? null);
   // where a phone can open this app now, for the pairing QR code: the served address, else this one when it is not loopback
   const pairUrl = plan.kind === "here" || plan.kind === "served" ? plan.url : isLoopbackHost(window.location.hostname) ? null : window.location.origin;
@@ -851,7 +855,9 @@ function DevicesPage({ auth, onSignOut }: { auth: HealthAuth | null; onSignOut: 
   return (
     <>
       <SettingsGroup title={t("Phone")} section="phone">
-        <div className="settings-item"><PhonePanel plan={plan} loading={access === undefined} onRefresh={loadAccess} /></div>
+        {owner
+          ? <p className="settings-item settings-hint">{t("On a phone, open this server's address and sign in with your owner passkey.")}</p>
+          : <div className="settings-item"><PhonePanel plan={plan} loading={access === undefined} onRefresh={loadAccess} /></div>}
         <SettingsRow label={t("Keep screen on")} description={<>{t("While a terminal or chat pane is open.")}{wakeLockProblem !== null && <span className="settings-condition">{wakeLockProblem}</span>}</>}>
           <Toggle label={t("Keep screen on")} checked={settings.keepScreenOn} onChange={(keepScreenOn) => update({ keepScreenOn })} />
         </SettingsRow>
@@ -860,18 +866,20 @@ function DevicesPage({ auth, onSignOut }: { auth: HealthAuth | null; onSignOut: 
         </SettingsRow>
       </SettingsGroup>
 
-      <PortalPanel readOnly={auth?.role === "watch"} />
+      {!owner && <PortalPanel readOnly={auth?.role === "watch"} />}
 
       <SettingsGroup title={t("Devices")} section="devices">
         <div className="settings-item"><DevicesPanel pairUrl={pairUrl} auth={auth} /></div>
         {onSignOut && (
-          <SettingsRow label={t("Sign out")} description={t("Forget this browser's sign-in. Getting back in takes the access token or a pairing code.")}>
+          <SettingsRow label={t("Sign out")} description={owner ? t("End this browser's owner session. Getting back in takes the owner's passkey.") : t("Forget this browser's sign-in. Getting back in takes the access token or a pairing code.")}>
             <button type="button" className="btn" onClick={() => setConfirmSignOut(true)}>{t("Sign out")}</button>
           </SettingsRow>
         )}
         {onSignOut && confirmSignOut && (
           <ConfirmDialog title={t("Sign out of this browser?")}
-            body={t("Getting back in takes the access token, or a pairing code from the PC: Settings → Phone & devices there, or the pair command in its terminal.")}
+            body={owner
+              ? t("The owner session ends on the server. Getting back in takes the owner's passkey: pairing codes and the access token are off while owner passkey sign-in is on.")
+              : t("Getting back in takes the access token, or a pairing code from the PC: Settings → Phone & devices there, or the pair command in its terminal.")}
             confirmLabel={t("Sign out")} onClose={() => setConfirmSignOut(false)} onConfirm={onSignOut} />
         )}
       </SettingsGroup>

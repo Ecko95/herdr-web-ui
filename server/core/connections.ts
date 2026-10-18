@@ -6,6 +6,7 @@
 import type { ServerWebSocket } from "bun";
 import type { ClientRole, ServerMessage } from "../../shared/protocol.ts";
 import { OUTPUT_STALLED_CLOSE_CODE } from "../../shared/terminal-flow.ts";
+import type { OwnerStore } from "../motoko-owner.ts";
 import type { DeviceStore } from "../devices.ts";
 import { HerdrError, herdrSocketPath } from "../herdr/client.ts";
 import type { MachineRelay } from "../machine-relay.ts";
@@ -14,6 +15,7 @@ import type { PendingInputs } from "../pending-input.ts";
 import { PaneWatch } from "../watch.ts";
 
 export interface SocketData {
+  ownerSessionId?: string;
   deviceId?: string;
   readOnly?: boolean;
   relay?: MachineRelay;
@@ -31,6 +33,7 @@ interface ConnectionState {
   /** how often `mode` changed: a switch away and back during an await is still a change */
   roles: number;
   watches: Map<string, PaneWatch>;
+  unwatchOwner?: () => void;
   unwatchDevice?: () => void;
 }
 
@@ -44,7 +47,7 @@ function stateOf(client: Client): ConnectionState {
 }
 
 /** The data for a connection's upgrade: it starts to interact unless its access is read-only. */
-export function connectionData(fields: { relay?: MachineRelay; deviceId: string | undefined; readOnly: boolean }): SocketData {
+export function connectionData(fields: { ownerSessionId?: string; relay?: MachineRelay; deviceId: string | undefined; readOnly: boolean }): SocketData {
   const data: SocketData = { attached: new Map<string, { keepSize: boolean }>(), conversationInterests: new Set<string>(), output: new Map(), ...fields };
   states.set(data, { closing: false, revoked: false, mode: fields.readOnly ? "observe" : "interact", roles: 0, watches: new Map<string, PaneWatch>() });
   return data;
@@ -93,22 +96,24 @@ export function send(client: Client, message: ServerMessage): number {
  * What a connection may do, its observe processes, and its end. A connection's panes stay with the
  * terminal code: `detachClaimed` detaches them while the claims still count, `dropClaims` forgets them.
  */
-export function createConnections<Lease>({ clients, present, pending, devices, detachClaimed, dropClaims }: {
+export function createConnections<Lease>({ clients, present, pending, devices, detachClaimed, dropClaims, owner }: {
   clients: Set<Client>;
   present: Set<Client>;
   pending: PendingInputs<Client, Lease>;
   devices: DeviceStore;
+  owner?: OwnerStore | null;
   detachClaimed: (client: Client) => void;
   dropClaims: (client: Client) => void;
 }) {
   /** authorizeSocket as a test: may this connection type now? */
   function mayType(client: Client): boolean {
     const state = stateOf(client);
-    return clients.has(client) && !state.closing && !state.revoked && !client.data.readOnly && state.mode !== "observe";
+    return clients.has(client) && !state.closing && !state.revoked && (!owner || !!client.data.ownerSessionId && !!owner.current(client.data.ownerSessionId)) && !client.data.readOnly && state.mode !== "observe";
   }
 
   function authorizeSocket(client: Client): void {
     const state = stateOf(client);
+    if (owner && (!client.data.ownerSessionId || !owner.current(client.data.ownerSessionId))) throw new HerdrError("owner_required", "Owner access revoked");
     if (state.revoked) throw new HerdrError("device_revoked", "this device's access was revoked");
     if (client.data.readOnly || state.mode === "observe") throw new HerdrError("read_only", "this connection can only watch");
   }
@@ -116,6 +121,10 @@ export function createConnections<Lease>({ clients, present, pending, devices, d
   /** Ends the connection when its device is revoked, at once for one revoked already: then it is not admitted. */
   function admit(client: Client): boolean {
     const state = stateOf(client);
+    if (owner && client.data.ownerSessionId) {
+      state.unwatchOwner = owner.onRevoke(client.data.ownerSessionId, () => end(client, "revoked"));
+      if (state.revoked) return false;
+    }
     if (client.data.deviceId) {
       state.unwatchDevice = devices.onRevoke(client.data.deviceId, () => end(client, "revoked"));
       if (state.revoked) return false;
@@ -195,6 +204,7 @@ export function createConnections<Lease>({ clients, present, pending, devices, d
         return;
       }
       case "closed": {
+        state.unwatchOwner?.();
         state.unwatchDevice?.();
         state.closing = true;
         present.delete(client);

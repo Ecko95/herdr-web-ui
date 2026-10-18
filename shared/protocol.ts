@@ -342,14 +342,15 @@ export interface CLIProxyLoginStatus {
 }
 
 /** How a request got in, when it did. */
-export type AccessVia = "local" | "tailscale" | "device" | "token" | "open";
+export type AccessVia = "local" | "tailscale" | "device" | "token" | "open" | "owner";
 /** Why a request did not. */
-export type AccessRefusal = "other_user" | "pairing_required" | "token_required";
+export type AccessRefusal = "other_user" | "pairing_required" | "token_required" | "owner_required" | "owner_store_unavailable";
 /** What a paired device may do: drive (type, answer, manage) or only watch. */
 export type DeviceRole = "drive" | "watch";
 
 /** GET /api/health `auth`: `authenticated` is whether this request got in; `required` is the opposite, kept for older clients. */
 export interface HealthAuth {
+  owner?: { enrolled: boolean };
   readonly required: boolean;
   readonly authenticated: boolean;
   readonly via?: AccessVia;

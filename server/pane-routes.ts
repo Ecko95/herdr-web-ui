@@ -4,10 +4,11 @@
  * resize, clear, focus, paste an image). Each answers from herdr alone, so none needs the
  * server's own state. The dispatcher in index.ts runs the access gate first.
  */
+import { OwnerError, ownerError } from "./motoko-owner.ts";
 import type { AgentRenameRequest, PaneDirection, PaneResized, PaneSplit, PaneSwapped, PaneZoomed, ReadFormat, ReadSource } from "../shared/protocol.ts";
 import { paneCommands } from "./commands.ts";
 import { paneFiles } from "./files.ts";
-import { badRequest, conflictResponse, errorResponse, isCount, isJsonObject, jsonResponse, readJsonObject } from "./http.ts";
+import { badRequest, conflictResponse, errorResponse as defaultErrorResponse, isCount, isJsonObject, jsonResponse, readJsonObject } from "./http.ts";
 import { conversationImage, ConversationUnavailable, forgetPaneTranscriptState, HistoryChanged, paneConversation, paneProcessRoots, toolOutput } from "./conversation.ts";
 import { OPENCODE_TOOL_REF } from "./opencode.ts";
 import { DevinHistoryChanged } from "./devin.ts";
@@ -31,8 +32,10 @@ export async function paneContext(paneId: string): Promise<{ agent: string | nul
   return { agent: pane.agent ?? pane.agent_session?.agent ?? null, cwd };
 }
 
+function errorResponse(error: unknown): Response { return error instanceof OwnerError ? ownerError(error) : defaultErrorResponse(error); }
+
 /** The answer for a pane route, or null when the path is not one. */
-export async function handlePaneRequest(request: Request, url: URL, pathname: string, options: PaneStores): Promise<Response | null> {
+export async function handlePaneRequest(request: Request, url: URL, pathname: string, options: PaneStores, checkOwner: () => void = () => {}): Promise<Response | null> {
   if (pathname === "/api/pane/rename") {
     if (request.method !== "POST") return badRequest("method_not_allowed", "use POST");
     const payload = await readJsonObject<{ pane_id?: unknown; label?: unknown }>(request);
@@ -40,7 +43,7 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     if (typeof payload.pane_id !== "string" || payload.pane_id.length === 0) return badRequest("missing_pane_id", "pane_id is required");
     if (typeof payload.label !== "string") return badRequest("missing_label", "label is required");
     try {
-      await paneRename(payload.pane_id, payload.label.length === 0 ? null : payload.label);
+      await (checkOwner(), paneRename(payload.pane_id, payload.label.length === 0 ? null : payload.label));
       return jsonResponse({ ok: true });
     } catch (error) {
       return errorResponse(error);
@@ -55,7 +58,7 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     if (payload.name !== null && typeof payload.name !== "string") return badRequest("invalid_name", "name must be a string, or null to clear it");
     // the rule and the uniqueness are herdr's: its refusal comes back as it is
     try {
-      await agentRename(payload.pane_id, payload.name);
+      await (checkOwner(), agentRename(payload.pane_id, payload.name));
       return jsonResponse({ ok: true });
     } catch (error) {
       return errorResponse(error);
@@ -121,12 +124,12 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     }
     if (payload.content_revision !== undefined && !isCount(payload.content_revision)) return badRequest("invalid_revision", "content_revision must be a non-negative integer");
     try {
-      return jsonResponse(await paneFind({
+      return jsonResponse(await (checkOwner(), paneFind({
         pane_id: payload.pane_id, query: payload.query, direction: payload.direction,
         ...(payload.jump !== undefined ? { jump: payload.jump } : {}),
         ...(isJsonObject(previous) && point(previous.start) && point(previous.end) ? { previous: { start: previous.start, end: previous.end } } : {}),
         ...(payload.content_revision !== undefined ? { content_revision: payload.content_revision } : {}),
-      }));
+      })));
     } catch (error) {
       if (error instanceof HerdrError && error.code === "stale_content") return conflictResponse(error.code, error.message);
       return errorResponse(error);
@@ -149,7 +152,7 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     if (typeof payload.pane_id !== "string" || payload.pane_id.length === 0) return badRequest("missing_pane_id", "pane_id is required");
     if (!isCount(payload.offset_from_bottom)) return badRequest("invalid_offset", "offset_from_bottom must be a non-negative integer");
     try {
-      return jsonResponse({ scroll: await paneScroll(payload.pane_id, payload.offset_from_bottom) });
+      return jsonResponse({ scroll: await (checkOwner(), paneScroll(payload.pane_id, payload.offset_from_bottom)) });
     } catch (error) {
       return errorResponse(error);
     }
@@ -237,10 +240,10 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     try {
       if (pathname === "/api/pane/input") {
         if (typeof payload.text !== "string") return badRequest("missing_text", "text is required");
-        await paneSendText(payload.pane_id, payload.text);
+        await (checkOwner(), paneSendText(payload.pane_id, payload.text));
       } else {
         if (!Array.isArray(payload.keys) || !payload.keys.every((key) => typeof key === "string")) return badRequest("missing_keys", "keys must be an array");
-        await paneSendKeys(payload.pane_id, payload.keys);
+        await (checkOwner(), paneSendKeys(payload.pane_id, payload.keys));
       }
       return jsonResponse({ ok: true });
     } catch (error) {
@@ -256,7 +259,7 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     try {
       // herdr emits pane.closed -> the collector broadcasts session-changed, so
       // every client refetches and the pane leaves sidebars on its own
-      await paneClose(payload.pane_id);
+      await (checkOwner(), paneClose(payload.pane_id));
       // the pane is gone: whatever its chat parsed is released with it (server/conversation.ts)
       forgetPaneTranscriptState(payload.pane_id);
       return jsonResponse({ ok: true });
@@ -273,7 +276,7 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     if (!Array.isArray(payload.path) || !payload.path.every((step) => typeof step === "boolean")) return badRequest("invalid_path", "path must be an array of booleans");
     if (typeof payload.ratio !== "number" || !Number.isFinite(payload.ratio) || payload.ratio < 0.1 || payload.ratio > 0.9) return badRequest("invalid_ratio", "ratio must be a number from 0.1 to 0.9");
     try {
-      await layoutSetSplitRatio(payload.tab_id, payload.path, payload.ratio);
+      await (checkOwner(), layoutSetSplitRatio(payload.tab_id, payload.path, payload.ratio));
       return jsonResponse({ ok: true });
     } catch (error) { return errorResponse(error); }
   }
@@ -291,22 +294,22 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
     const paneId = payload.pane_id;
     try {
       if (pathname === "/api/pane/focus") {
-        await paneFocus(paneId);
+        await (checkOwner(), paneFocus(paneId));
         return jsonResponse({ ok: true });
       }
       if (pathname === "/api/pane/split") {
         if (payload.direction !== "right" && payload.direction !== "down") return badRequest("invalid_direction", "direction must be right or down");
         if (payload.focus !== undefined && typeof payload.focus !== "boolean") return badRequest("invalid_focus", "focus must be a boolean");
-        const pane = await paneSplit(paneId, payload.direction, payload.focus === true);
+        const pane = await (checkOwner(), paneSplit(paneId, payload.direction, payload.focus === true));
         return jsonResponse({ ok: true, pane } satisfies PaneSplit);
       }
       if (pathname === "/api/pane/zoom") {
         if (payload.mode !== undefined && payload.mode !== "toggle" && payload.mode !== "on" && payload.mode !== "off") return badRequest("invalid_mode", "mode must be toggle, on or off");
-        const zoom = await paneZoom(paneId, payload.mode ?? "toggle");
+        const zoom = await (checkOwner(), paneZoom(paneId, payload.mode ?? "toggle"));
         return jsonResponse({ ok: true, zoomed: zoom.zoomed, changed: zoom.changed, reason: zoom.reason } satisfies PaneZoomed);
       }
       if (pathname === "/api/pane/clear") {
-        await paneClear(paneId);
+        await (checkOwner(), paneClear(paneId));
         return jsonResponse({ ok: true });
       }
       if (pathname === "/api/pane/swap") {
@@ -315,8 +318,8 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
           if (typeof payload.target_pane_id !== "string" || !payload.target_pane_id.trim()) return badRequest("invalid_target_pane_id", "target_pane_id must be a non-empty string");
         } else if (!isPaneDirection(payload.direction)) return badRequest("invalid_direction", "direction must be left, right, up or down");
         const swap = typeof payload.target_pane_id === "string"
-          ? await paneSwapWith(paneId, payload.target_pane_id)
-          : await paneSwap(paneId, payload.direction as PaneDirection);
+          ? await (checkOwner(), paneSwapWith(paneId, payload.target_pane_id))
+          : await (checkOwner(), paneSwap(paneId, payload.direction as PaneDirection));
         return jsonResponse({ ok: true, changed: swap.changed, reason: swap.reason, target_pane_id: swap.target_pane_id } satisfies PaneSwapped);
       }
       if (!isPaneDirection(payload.direction)) return badRequest("invalid_direction", "direction must be left, right, up or down");
@@ -325,7 +328,7 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
       if (payload.amount !== undefined && !(typeof payload.amount === "number" && Number.isFinite(payload.amount) && payload.amount > 0 && payload.amount <= 0.5)) {
         return badRequest("invalid_amount", "amount must be a number above 0 and at most 0.5");
       }
-      const resize = await paneResize(paneId, payload.direction, payload.amount);
+      const resize = await (checkOwner(), paneResize(paneId, payload.direction, payload.amount));
       return jsonResponse({ ok: true, changed: resize.changed, reason: resize.reason } satisfies PaneResized);
     } catch (error) {
       return errorResponse(error);
@@ -349,12 +352,12 @@ export async function handlePaneRequest(request: Request, url: URL, pathname: st
       return badRequest("invalid_image", "content_type, data_base64 and name must be strings");
     }
     try {
-      const path = await savePaneImage({
+      const path = await (checkOwner(), savePaneImage({
         paneId: payload.pane_id,
         contentType: payload.content_type ?? "",
         dataBase64: payload.data_base64 ?? "",
         name: payload.name,
-      });
+      }));
       return jsonResponse({ ok: true, path });
     } catch (error) {
       if (error instanceof PasteImageError) {

@@ -60,19 +60,24 @@ const KILL_GRACE_MS = 2_000;
  * them after a failed one is the updater's own job (fetchInto) — a slow unshallow fetch
  * leaked 17 GiB of them in three days (#1252).
  */
-export function runCommand(cwd: string, argv: string[], signal?: AbortSignal, timeout = 30_000, grace = KILL_GRACE_MS): Promise<string> {
+export function runCommand(cwd: string, argv: string[], signal?: AbortSignal, timeout = 30_000, grace = KILL_GRACE_MS, deps: { spawn?: typeof spawn; kill?: typeof process.kill } = {}): Promise<string> {
+  const kill = deps.kill ?? process.kill.bind(process);
   return new Promise((resolve, reject) => {
-    const child = spawn(argv[0]!, argv.slice(1), {
+    const child = (deps.spawn ?? spawn)(argv[0]!, argv.slice(1), {
       cwd, detached: true, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" },
     });
     let output = "", errors = "", failure: string | null = null;
+    // Live cancellation retains group cleanup after leader exit.
+    let terminating = false;
     let killTimer: ReturnType<typeof setTimeout> | null = null;
     const killGroup = (sig: "SIGTERM" | "SIGKILL") => {
-      if (child.pid) { try { process.kill(-child.pid, sig); } catch { child.kill(sig); } }
+      if (child.pid) { try { kill(-child.pid, sig); } catch { child.kill(sig); } }
     };
     const cancel = (reason: string) => {
       failure = reason;
+      if (child.exitCode !== null || child.signalCode !== null) return;
+      terminating = true;
       killGroup("SIGTERM");
       killTimer ??= setTimeout(() => killGroup("SIGKILL"), grace);
     };
@@ -87,7 +92,7 @@ export function runCommand(cwd: string, argv: string[], signal?: AbortSignal, ti
     child.on("close", code => {
       // a group member that ignores SIGTERM and holds none of our pipes outlives the child: the
       // grace timer cleanup clears would have been its only end
-      if (failure !== null) killGroup("SIGKILL");
+      if (terminating) killGroup("SIGKILL");
       cleanup();
       if (code === 0 && !failure) resolve(output.trim());
       else reject(new Error(failure ?? `${argv.slice(0, 3).join(" ")} failed: ${errors.trim() || code}`));

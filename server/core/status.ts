@@ -31,7 +31,7 @@ import { type Client, send } from "./connections.ts";
 /** a focus or reconnect re-reads the panes for the daily active message at most this often */
 const VISIT_READ_MS = 10 * 60_000;
 
-export function createStatusHub<Lease>({ options, devices, clients, present, pending, drainPending, holdPendingPane, usage, usageLogin }: {
+export function createStatusHub<Lease>({ options, devices, clients, present, pending, drainPending, holdPendingPane, usage, usageLogin, ownerMode = false }: {
   options: {
     stateDir?: string;
     codexHome?: string;
@@ -43,6 +43,7 @@ export function createStatusHub<Lease>({ options, devices, clients, present, pen
     backgroundWait?: { grace: number; limit: number };
     statusNow?: () => number;
   };
+  ownerMode?: boolean;
   devices: DeviceStore;
   clients: Set<Client>;
   present: Set<Client>;
@@ -154,8 +155,8 @@ export function createStatusHub<Lease>({ options, devices, clients, present, pen
   /** A pane's status frame: every one says whether the pane waits on its turn's background work. */
   const paneStatus = (paneId: string, status: AgentStatus, about: { background_tasks?: number; plan?: PlanSummary | null } = {}): ServerMessage =>
     ({ type: "pane-status", pane_id: paneId, agent_status: status, ...about, ...(waits.waiting(paneId) ? { background_wait: true as const } : {}) });
-  const machines = options.machines === false ? null : new MachineManager(options.stateDir ?? defaultStateDir(), push, completions, clientSnapshot);
-  if (machines && options.herdrProfiles) machines.watchHerdrProfiles(options.herdrProfiles);
+  const machines = !ownerMode && options.machines === false ? null : new MachineManager(options.stateDir ?? defaultStateDir(), push, completions, clientSnapshot, { localOnly: ownerMode });
+  if (!ownerMode && machines && options.herdrProfiles) machines.watchHerdrProfiles(options.herdrProfiles);
 
   function broadcastAll(message: ServerMessage): void {
     machines?.localMessage(message);

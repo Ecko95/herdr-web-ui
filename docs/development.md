@@ -677,3 +677,25 @@ input regression matrix.
 | [`docs/`](.) | Remote PCs, updates, flow control, chat audit, brand assets and README media (`docs/media/`) |
 | [`site/`](../site/) | The website, built by `scripts/build-site.ts` and deployed by GitHub Pages |
 | [`DESIGN.md`](../DESIGN.md) | Design tokens and UI conventions |
+
+## Motoko private configuration
+
+Motoko reads one fixed rig from private startup configuration. The plugin reads its existing `env` or `.env` file in its configuration directory.
+Set these three values in that private file before server startup. The following values are fictional examples.
+
+```dotenv
+HERDR_WEB_MOTOKO_RIG_ID=01ARZ3NDEKTSV4RRFFQ69G5FAV
+HERDR_WEB_MOTOKO_RIG_NAME=fiction-lab
+HERDR_WEB_MOTOKO_SOURCE_SESSION=fiction-owner@external
+```
+
+The rig ID uses OpenRig’s 26-character identifier format. The rig name starts with a lowercase letter and contains lowercase letters, digits, or hyphens.
+The rig name has a maximum of 48 characters. The human ID follows the same name rules and uses the `@external` address suffix.
+The server checks that human ID and its exact address against the registered human record at startup.
+The destination is always `team-orchestrator@<configured-rig-name>`. Request fields cannot change this scope.
+
+Missing or invalid configuration disables Motoko reads and owner requests. Other Herdr routes retain their existing behavior.
+The server never uses fixture data as a fallback. A configuration change requires a server restart.
+Saved receipts retain their original rig ID, source, and destination. A scope mismatch refuses all queue access and leaves stored bytes unchanged.
+Older receipts without a rig ID also refuse queue access. This change does not migrate or replace those receipts.
+Keep actual deployment values out of source files, browser configuration, and public diagnostics.

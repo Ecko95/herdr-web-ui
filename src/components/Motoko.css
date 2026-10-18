@@ -1,0 +1,255 @@
+/*
+ * Motoko (Motoko.tsx): drawn over the pane area, which stays mounted under it so the terminals
+ * keep their attachments. Tokens from styles.css only; the cards and banners take the surfaces
+ * and status colors the sidebar and notices already use.
+ */
+
+.motoko {
+  position: absolute;
+  inset: 0;
+  /* over the pane's own overlays (its placeholder, the input-waiting pill) */
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.motoko-head {
+  z-index: 1;
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-panel);
+  border-bottom: var(--hairline) solid var(--border);
+}
+
+.motoko-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--text-strong);
+}
+
+.motoko-title:focus {
+  outline: none;
+}
+
+.motoko-tabs {
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+  margin-right: auto;
+  /* four tabs do not fit beside the close button at phone width: they scroll, the button stays */
+  overflow-x: auto;
+}
+
+.motoko-head > .icon-button {
+  flex-shrink: 0;
+}
+
+.motoko-tabs [aria-selected="true"] {
+  background: var(--accent-tint);
+  color: var(--text-strong);
+}
+
+.motoko-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(100%, var(--content-w));
+  padding: var(--space-4);
+}
+
+.motoko-note {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--text-dim);
+}
+
+.motoko-banner {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+  background: var(--bg-elevated);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+}
+
+.motoko-banner.is-stale {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+.motoko-banner.is-error {
+  background: var(--danger-tint);
+  border-color: var(--status-blocked);
+  color: var(--text-strong);
+}
+
+.motoko-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.motoko-sample,
+.motoko-hint {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.motoko-hint {
+  margin: 0;
+}
+
+.motoko-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.motoko-metrics > div,
+.motoko-card {
+  padding: var(--space-3);
+  background: var(--bg-panel);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.motoko-metrics dt,
+.motoko-facts dt {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.motoko-metrics dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+
+.motoko-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.motoko-subtitle {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+
+.motoko-subtitle:focus {
+  outline: none;
+}
+
+.motoko-domain {
+  margin-left: var(--space-2);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--text-dim);
+}
+
+.motoko-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.motoko-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.motoko-card.is-attention {
+  border-color: var(--status-blocked);
+}
+
+.motoko-card-title {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.motoko-summary {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.motoko-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.motoko-facts {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  margin: var(--space-1) 0 0;
+}
+
+.motoko-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.motoko-facts dd {
+  margin: 0;
+  text-align: right;
+  font-size: var(--fs-sm);
+}
+
+.motoko-add {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.motoko-request-text {
+  width: 100%;
+  resize: vertical;
+}
+
+.motoko-card.is-final {
+  border-color: var(--status-done);
+}
+
+.motoko-label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+@media (max-width: 768px) {
+  .motoko-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .motoko-body {
+    padding: var(--space-3);
+  }
+}

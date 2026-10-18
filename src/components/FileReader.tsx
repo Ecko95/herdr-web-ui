@@ -13,7 +13,7 @@ import { OpenFileContext } from "../lib/filePaths.ts";
 import { MachineContext } from "../lib/machineContext.tsx";
 import { useT } from "../lib/i18n.ts";
 import { readerFromSearch, readerHref, resolveFromDocument, type ReaderTarget } from "../lib/fileReader.ts";
-import type { AccessRefusal } from "../../shared/protocol.ts";
+import type { GateReason, OwnerAuth } from "../lib/motoko.ts";
 
 const close = (): void => {};
 
@@ -23,7 +23,8 @@ export function FileReader({ target }: { target: ReaderTarget }) {
   // the same gate as the app's: a tab opened from a bookmark or another browser signs in here, and
   // the document is read once the server has set its cookie
   const [locked, setLocked] = useState<boolean | null>(null);
-  const [lockReason, setLockReason] = useState<AccessRefusal | null>(null);
+  const [lockReason, setLockReason] = useState<GateReason | null>(null);
+  const [ownerEnrolled, setOwnerEnrolled] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     let alive = true;
     const probe = async (): Promise<void> => {
@@ -32,6 +33,7 @@ export function FileReader({ target }: { target: ReaderTarget }) {
         if (!alive) return;
         setLocked(health.auth.required && !health.auth.authenticated);
         setLockReason(health.auth.reason ?? null);
+        setOwnerEnrolled((health.auth as OwnerAuth).owner?.enrolled);
       } catch { if (alive) setLocked(false); }
     };
     void probe();
@@ -58,7 +60,7 @@ export function FileReader({ target }: { target: ReaderTarget }) {
   }, [path, target.machine]);
 
   if (locked === null) return <main className="file-reader"><p className="file-viewer-note" role="status">{t("Opening…")}</p></main>;
-  if (locked) return <AccessGate reason={lockReason} initialCode="" onUnlocked={() => setLocked(false)} />;
+  if (locked) return <AccessGate reason={lockReason} initialCode="" ownerEnrolled={ownerEnrolled} onUnlocked={() => setLocked(false)} />;
   // the app's update line is not here, so a part that cannot load (math, a diagram) is told on its own
   return <div className="file-reader-frame">
     <ChunkFailureNotice />

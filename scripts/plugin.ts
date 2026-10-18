@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { ownerStartupRequired, requirePrivateReadiness, preparePrivateDirectory, readOwnerLauncher, writeOwnerLauncher, readReadiness, clearReadiness,
+  MAINTENANCE_FIELDS, maintenanceStart, maintenanceLeft, maintenanceQueryable, processIdentity, readMaintenanceLaunch, readMaintenanceReady, type ProcessIdentity } from "../server/readiness.ts";
 /**
  * herdr plugin lifecycle for the web UI.
  *
@@ -21,7 +24,7 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 
@@ -101,6 +104,7 @@ const shadowed = fileVars.length === 2 ? Object.keys(fileVars[0]!).filter((key) 
 const env = { ...process.env, ...Object.assign({}, ...fileVars) as Record<string, string> };
 /** HERDR_SOCKET the user put in the config files: it names the session to show, so herdr's own socket does not replace it */
 const configuredSocket = fileVars.some((vars) => (vars["HERDR_SOCKET"] ?? "") !== "");
+const ownerMode = ownerStartupRequired(env);
 const PATH_KEY = platform() === "win32" ? Object.keys(env).sort().find(key => key.toLowerCase() === "path") ?? "PATH" : "PATH";
 /** the app's own state, as the server finds it (server/update-state.ts): the same path with or without herdr's env */
 const APP_STATE_DIR = env["HERDR_WEB_STATE_DIR"] || join(env["XDG_CONFIG_HOME"] || join(homedir(), ".config"), "herdr-web-ui");
@@ -138,6 +142,7 @@ function qr(text: string): string {
 }
 
 async function health(): Promise<boolean> {
+  if (ownerMode) return readReadiness(ROOT, port, APP_STATE_DIR, readOwnerLauncher(PID_FILE)) !== null;
   try {
     const response = await fetch(`${origin}/api/health`, { signal: AbortSignal.timeout(1500) });
     if (!response.ok) return false;
@@ -152,6 +157,7 @@ async function health(): Promise<boolean> {
 
 /** Whether the app holds the port: its bridge health answers without asking herdr. */
 async function appOnPort(): Promise<boolean> {
+  if (ownerMode) return health();
   try {
     const response = await fetch(`${origin}/api/health?scope=bridge`, { signal: AbortSignal.timeout(1500) });
     if (!response.ok) return false;
@@ -183,6 +189,7 @@ async function healthError(): Promise<string | null> {
 }
 
 function recordedPid(): number | null {
+  if (ownerMode) return readOwnerLauncher(PID_FILE)?.pid ?? null;
   return pidIn(PID_FILE);
 }
 
@@ -249,6 +256,7 @@ async function settlePort(): Promise<"ready" | "running" | "failed"> {
     failStart(`herdr web ui is running at ${origin}${pid === null ? "" : ` (pid ${pid})`} but cannot reach herdr: ${why}. It keeps this port and answers again once herdr is back.`);
     return "failed";
   }
+  if (ownerMode) { failStart("Owner mode cannot verify the process on the configured port; the listener was left unchanged"); return "failed"; }
   const settings = CONFIG_FILES.at(-1) ?? join(CONFIG_DIR, "env");
   const blocked = platform() === "win32"
     ? `port ${port} on ${host} cannot be opened: another program has it, or Windows reserves it for Hyper-V, WSL2 or Docker (netsh interface ipv4 show excludedportrange protocol=tcp lists the reserved ranges).`
@@ -268,13 +276,84 @@ async function settlePort(): Promise<"ready" | "running" | "failed"> {
   return "ready";
 }
 
+/** The child env of a start: this script's settings plus the server's port and herdr socket. */
+const serverEnv = (extra: Record<string, string> = {}): Record<string, string | undefined> => ({
+  ...env,
+  [PATH_KEY]: toolPath(),
+  HOST: host,
+  PORT: String(port),
+  ...extra,
+  // herdr hands the plugin HERDR_SOCKET_PATH; the server (and the attach it
+  // spawns) reads HERDR_SOCKET
+  ...(env["HERDR_SOCKET_PATH"] !== undefined && !configuredSocket ? { HERDR_SOCKET: env["HERDR_SOCKET_PATH"] } : {}),
+});
+
+/**
+ * The legacy maintenance start (server/readiness.ts maintenanceStart): one attempt for a caller that
+ * stopped the old tree itself. It never stops, signals, waits on or follows another listener, and it
+ * prints one JSON result line: the identities a caller needs to keep custody of what this start made. Right after the
+ * spawn it prints one earlier line with the launcher's birth, read while it is this process's unreaped child.
+ */
+async function maintenanceLaunch(): Promise<number> {
+  const result = { version: 1, mode: "legacy-maintenance", status: "refused" as "refused" | "failed" | "expired" | "ready", starter: process.pid,
+    launcher_pid: null as number | null, launcher_birth: null as ProcessIdentity | null, launcher_exit: null as number | null, launch: null as ProcessIdentity | null,
+    ready: null as { boot_id: string; launcher: ProcessIdentity; supervisor: ProcessIdentity; bridge: ProcessIdentity } | null, error: null as string | null };
+  const report = (status: typeof result.status, error: string | null = null): number => {
+    Object.assign(result, { status, error });
+    if (error !== null) { process.stderr.write(`maintenance start: ${error}
+`); try { appendFileSync(LOG_FILE, `maintenance start: ${error}
+`); } catch { /* no state dir yet */ } }
+    process.stdout.write(`${JSON.stringify(result)}
+`);
+    return status === "ready" ? 0 : 1;
+  };
+  if (fileVars.some(vars => MAINTENANCE_FIELDS.some(name => name in vars))) return report("refused", "maintenance fields must come from the process environment, not a settings file");
+  let maintenance;
+  try { maintenance = maintenanceStart(env); } catch (error) { return report("refused", (error as Error).message); }
+  if (!maintenance) return report("refused", "maintenance start needs both process fields");
+  if (!portSet || !/^[1-9]\d{0,4}$/.test(env["PORT"] ?? "") || port > 65535) return report("refused", "maintenance start needs a fixed PORT");
+  const rootSet = process.env["HERDR_PLUGIN_ROOT"] ?? "";
+  let exact = false;
+  try { exact = rootSet !== "" && rootSet === resolve(rootSet) && realpathSync(rootSet) === rootSet; } catch { /* missing root */ }
+  if (!exact) return report("refused", "maintenance start needs the exact root: an absolute, resolved HERDR_PLUGIN_ROOT");
+  if (!await canBind(host, port)) return report("refused", `port ${port} on ${host} is occupied; the listener was left unchanged`);
+  if (maintenanceLeft(maintenance) <= 0) return report("refused", "maintenance deadline expired before launch");
+  mkdirSync(STATE_DIR, { recursive: true });
+  const log = openSync(LOG_FILE, "a");
+  const child = spawn(process.execPath, [join(ROOT, "server", "managed.ts")], { cwd: ROOT, detached: true, windowsHide: true, stdio: ["ignore", log, log], env: serverEnv() });
+  child.unref();
+  if (child.pid === undefined) return report("refused", "could not spawn the server");
+  result.launcher_pid = child.pid;
+  result.launcher_birth = maintenanceQueryable(child.pid) ? processIdentity(child.pid) : null;
+  process.stdout.write(`${JSON.stringify({ version: 1, mode: "legacy-maintenance", event: "spawned", starter: process.pid, launcher_birth: result.launcher_birth })}\n`);
+  try { writeFileSync(PID_FILE, `${child.pid}\n`, { mode: 0o600 }); }
+  catch (error) { return report("failed", `server.pid write failed after spawn (${(error as Error).message}); the launcher pid is retained here`); }
+  const untilDeadline = () => maintenanceLeft(maintenance);
+  const observe = () => { result.launch ??= readMaintenanceLaunch(ROOT, port, APP_STATE_DIR, maintenance.nonce)?.launcher ?? null; result.launcher_exit = child.exitCode; };
+  while (untilDeadline() > 0 && child.exitCode === null) {
+    observe();
+    const ready = result.launch && readMaintenanceReady(ROOT, port, APP_STATE_DIR, maintenance.nonce);
+    if (ready && untilDeadline() > 0) {
+      result.ready = { boot_id: ready.boot_id, launcher: ready.launcher, supervisor: ready.supervisor, bridge: ready.bridge };
+      return report("ready");
+    }
+    await Bun.sleep(Math.max(0, Math.min(25, untilDeadline())));
+  }
+  observe();
+  return child.exitCode !== null
+    ? report("failed", `the maintenance launcher exited (${child.exitCode}) before it was ready; ${LOG_FILE} has its error`)
+    : report("expired", "the maintenance tree was not ready before its deadline; it is left to the caller's verified stop");
+}
+
 async function start(): Promise<number> {
+  if (MAINTENANCE_FIELDS.some(name => name in process.env || fileVars.some(vars => name in vars))) return maintenanceLaunch();
+  if (ownerMode) { try { requirePrivateReadiness(); preparePrivateDirectory(PID_FILE); } catch (error) { process.stderr.write(`${(error as Error).message}\n`); return 1; } }
   warnShadowed();
   if (await health()) {
     process.stdout.write(`herdr web ui already running at ${origin}\n`);
     return 0;
   }
-  mkdirSync(STATE_DIR, { recursive: true });
+  mkdirSync(STATE_DIR, { recursive: true, ...(ownerMode ? { mode: 0o700 } : {}) });
   const settled = await settlePort();
   if (settled === "failed") return 1;
   if (settled === "running") {
@@ -292,34 +371,28 @@ async function start(): Promise<number> {
   }
   const log = openSync(LOG_FILE, "a");
   const logged = statSync(LOG_FILE).size;
+  const launchNonce = randomUUID();
   const child = spawn(process.execPath, [join(ROOT, "server", "managed.ts")], {
     cwd: ROOT,
     detached: true,
     windowsHide: true,
     stdio: ["ignore", log, log],
-    env: {
-      ...env,
-      [PATH_KEY]: toolPath(),
-      HOST: host,
-      PORT: String(port),
-      // herdr hands the plugin HERDR_SOCKET_PATH; the server (and the attach it
-      // spawns) reads HERDR_SOCKET. A HERDR_SOCKET set in the config files wins.
-      ...(env["HERDR_SOCKET_PATH"] !== undefined && !configuredSocket ? { HERDR_SOCKET: env["HERDR_SOCKET_PATH"] } : {}),
-    },
+    env: serverEnv(ownerMode ? { HERDR_WEB_LAUNCH_NONCE: launchNonce } : {}),
   });
   child.unref();
   if (child.pid === undefined) {
     process.stderr.write("could not spawn the server\n");
     return 1;
   }
-  writeFileSync(PID_FILE, `${child.pid}\n`, { mode: 0o600 });
+  if (ownerMode) writeOwnerLauncher(PID_FILE, child.pid, launchNonce);
+  else writeFileSync(PID_FILE, `${child.pid}\n`, { mode: 0o600 });
 
   const deadline = Date.now() + READY_TIMEOUT_MS;
   // a server that has exited will not answer: its last words are in the log now
   while (Date.now() < deadline && child.exitCode === null) {
     if (await health()) {
       process.stdout.write(`herdr web ui listening at ${origin}\n`);
-      if ((env["HERDR_WEB_TOKEN"] ?? "") === "") {
+      if (!ownerMode && (env["HERDR_WEB_TOKEN"] ?? "") === "") {
         process.stdout.write(`no token set: your own Tailscale devices get in as you; pair any other device in Settings → Devices, or put HERDR_WEB_TOKEN=<token> in ${join(CONFIG_DIR, "env")}\n`);
       }
       return 0;
@@ -390,11 +463,18 @@ const stopDependencies: StopDependencies = {
  * gives up, and leaves nothing running.
  */
 export async function stop(dependencies: StopDependencies = stopDependencies): Promise<number> {
+  const ownerRecord = ownerMode ? readOwnerLauncher(PID_FILE) : null;
+  if (ownerMode && existsSync(PID_FILE) && !ownerRecord) { process.stderr.write("Cannot verify the owner launcher identity; no signal was sent\n"); return 1; }
   const pid = recordedPid();
   if (pid === null) {
     rmSync(PID_FILE, { force: true });
     process.stdout.write("herdr web ui is not running\n");
     return 0;
+  }
+  if (ownerRecord) {
+    const current = readOwnerLauncher(PID_FILE);
+    if (!current || current.startedAt !== ownerRecord.startedAt || current.nonce !== ownerRecord.nonce) { process.stderr.write("Cannot verify the owner launcher identity; no signal was sent\n"); return 1; }
+    clearReadiness(ROOT, port, APP_STATE_DIR, ownerRecord.nonce);
   }
   // the whole process group when the server leads one, as `start` spawns it
   let target = dependencies.isWindows ? pid : -pid;
@@ -474,7 +554,7 @@ export async function stop(dependencies: StopDependencies = stopDependencies): P
     }
   }
   // a start that ran meanwhile may have recorded its own server: leave that one's pid file alone
-  if (existsSync(PID_FILE) && Number(readFileSync(PID_FILE, "utf8").trim()) === pid) rmSync(PID_FILE, { force: true });
+  if (existsSync(PID_FILE) && (ownerRecord ? readOwnerLauncher(PID_FILE, false)?.nonce === ownerRecord.nonce : Number(readFileSync(PID_FILE, "utf8").trim()) === pid)) rmSync(PID_FILE, { force: true });
   process.stdout.write(`stopped herdr web ui (pid ${pid})${killed ? `; it was still running after ${STOP_TIMEOUT_MS / 1000}s, so it was killed` : ""}\n`);
   return 0;
 }

@@ -152,7 +152,7 @@ export class MachineManager {
   private heardAgents = new AgentNews();
   private localTimer: ReturnType<typeof setInterval>;
   private saveTimer?: ReturnType<typeof setTimeout>;
-  private profileState: HerdrProfileState;
+  private profileState!: HerdrProfileState;
   private statePath: string;
   private sshDir: string;
   private local: Machine = { id: LOCAL_MACHINE, name: hostname(), kind: "local", enabled: true, state: "connecting", error: null, snapshot: null };
@@ -165,18 +165,18 @@ export class MachineManager {
   private autoQueued = new Set<string>();
   private emitTimer?: ReturnType<typeof setTimeout>;
 
-  constructor(readonly stateDir: string, private push: PushService, private completions: CompletionTracker, private readLocal: () => Promise<SessionSnapshot> = () => this.completions.readSnapshot(sessionSnapshot, labelOmoPanes)) {
-    this.profileState = new HerdrProfileState(stateDir);
+  constructor(readonly stateDir: string, private push: PushService, private completions: CompletionTracker, private readLocal: () => Promise<SessionSnapshot> = () => this.completions.readSnapshot(sessionSnapshot, labelOmoPanes), private readonly options: { localOnly?: boolean } = {}) {
+    if (!options.localOnly) this.profileState = new HerdrProfileState(stateDir);
     this.statePath = join(stateDir, "machines.json");
     this.sshDir = join(stateDir, "ssh");
     this.settingsPath = join(stateDir, "machine-settings.json");
-    try {
+    if (!options.localOnly) try {
       const saved: unknown = JSON.parse(readFileSync(this.settingsPath, "utf8"));
       if (saved && typeof saved === "object" && typeof (saved as MachineSettings).auto_update_bridges === "boolean") this.preferences.auto_update_bridges = (saved as MachineSettings).auto_update_bridges;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.error(`Cannot read ${this.settingsPath}; remote PC settings start empty`);
     }
-    if (existsSync(this.statePath)) {
+    if (!options.localOnly && existsSync(this.statePath)) {
       const saved: unknown = JSON.parse(readFileSync(this.statePath, "utf8"));
       if (!Array.isArray(saved)) throw new Error("Invalid machines.json; registrations were preserved");
       for (const item of saved as StoredMachine[]) {
@@ -193,7 +193,7 @@ export class MachineManager {
   }
   /** Serial polling: a broken catalog preserves the last roster instead of removing PCs. */
   watchHerdrProfiles(read: () => Promise<HerdrMachineProfile[]>, intervalMs = 5000): void {
-    if (this.discoveryStarted || this.stopped) return;
+    if (this.options.localOnly || this.discoveryStarted || this.stopped) return;
     this.discoveryStarted = true;
     let failures = 0, previousError: string | undefined, previousSyncError: string | undefined;
     const poll = async () => {
@@ -220,7 +220,7 @@ export class MachineManager {
     void poll();
   }
   syncHerdrProfiles(profiles: HerdrMachineProfile[]): void {
-    if (this.stopped) return;
+    if (this.options.localOnly || this.stopped) return;
     const wanted = new Set<string>();
     let changed = false;
     const errors: unknown[] = [];
@@ -356,11 +356,12 @@ export class MachineManager {
     } finally { this.localBusy = false; }
   }
   private saveSoon(): void {
-    if (this.saveTimer || this.stopped) return;
+    if (this.options.localOnly || this.saveTimer || this.stopped) return;
     this.saveTimer = setTimeout(() => { this.saveTimer = undefined; if (!this.stopped) { try { this.persist(); } catch (e) { console.error("PC state could not be saved:", e instanceof Error ? e.message : "write failed"); } } }, 1000);
     this.saveTimer.unref();
   }
   private persist(): void {
+    if (this.options.localOnly) return;
     mkdirSync(this.stateDir, { recursive: true, mode: 0o700 });
     const data: StoredMachine[] = [...this.machines.values()].filter(({ machine }) => !machine.herdr_profile_id).map(({ machine: m }) => ({ id: m.id, name: m.name, target: m.target!, enabled: m.enabled, snapshot: m.snapshot }));
     const tmp = this.statePath + ".tmp";
@@ -399,6 +400,7 @@ export class MachineManager {
     return this.setup({ ...runtime.machine.target!, machine_id: id, update_remote: true }, { auto: true });
   }
   setup(request: SetupRequest, options: { auto?: boolean } = {}): SetupJob {
+    if (this.options.localOnly) throw new Error("Remote setup is disabled");
     if (this.stopped) throw new Error("Server stopping");
     let target = validateTarget(request);
     const existing = request.machine_id ? this.machines.get(request.machine_id) : undefined;
