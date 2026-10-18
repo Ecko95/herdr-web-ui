@@ -1,0 +1,22 @@
+{
+  "sampledAgoMs": 1000,
+  "staleAfterMs": 120000,
+  "rigs": [
+    {
+      "id": "sample-compact", "name": "sample-compact", "domain": "personal",
+      "seats": [
+        { "id": "a", "session": "a@sample-compact", "role": "builder", "runtime": "codex", "activity": "idle", "confidence": "oracle",
+          "context": { "used": 1000, "window": 200000, "observedAgoMs": 1000 },
+          "compactionReceipts": [
+            { "session": "a@sample-compact", "entryId": "e-1", "status": "applied" },
+            { "session": "a@sample-compact", "entryId": "e-1", "status": "applied" },
+            { "session": "a@sample-compact", "entryId": "e-2", "status": "applied" },
+            { "session": "a@sample-compact", "entryId": "e-3", "status": "requested" }
+          ] },
+        { "id": "b", "session": "b@sample-compact", "role": "builder", "runtime": "codex", "activity": "idle", "confidence": "oracle",
+          "context": { "used": 1000, "window": 200000, "observedAgoMs": 1000 }, "compactionReceipts": null }
+      ]
+    }
+  ],
+  "needsYou": []
+}

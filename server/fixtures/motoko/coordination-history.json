@@ -1,0 +1,7 @@
+{
+  "note": "Fictional. The browser check's queue answers a request with this many in-progress transitions, then the orchestrator's final result.",
+  "transitions": 420,
+  "noteBytes": 700,
+  "request": "Plan a fictional <b>Kyoto</b> day.\nKeep it short.",
+  "result": "Fictional plan: <i>temple</i> at 9, lunch at 12.\nNothing was booked."
+}

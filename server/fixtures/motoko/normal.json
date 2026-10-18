@@ -1,0 +1,54 @@
+{
+  "sampledAgoMs": 12000,
+  "staleAfterMs": 120000,
+  "rigs": [
+    {
+      "id": "sample-build",
+      "name": "sample-build",
+      "domain": "personal",
+      "seats": [
+        {
+          "id": "builder", "session": "builder@sample-build", "role": "builder", "runtime": "claude-code",
+          "activity": "working", "confidence": "oracle",
+          "context": { "used": 84000, "window": 200000, "observedAgoMs": 15000 },
+          "compactionReceipts": [
+            { "session": "builder@sample-build", "entryId": "e-101", "status": "applied" },
+            { "session": "builder@sample-build", "entryId": "e-101", "status": "applied" },
+            { "session": "builder@sample-build", "entryId": "e-214", "status": "applied" },
+            { "session": "builder@sample-build", "entryId": "e-300", "status": "requested" }
+          ]
+        },
+        {
+          "id": "reviewer", "session": "reviewer@sample-build", "role": "reviewer", "runtime": "codex",
+          "activity": "unknown", "confidence": "unknown",
+          "context": { "used": 51000, "window": null, "observedAgoMs": 40000 },
+          "compactionReceipts": null
+        }
+      ]
+    },
+    {
+      "id": "sample-ops",
+      "name": "sample-ops",
+      "domain": "unknown",
+      "seats": [
+        {
+          "id": "operator", "session": "operator@sample-ops", "role": "operator", "runtime": "codex",
+          "activity": "needs_input", "confidence": "inferred",
+          "context": { "used": null, "window": null, "observedAgoMs": null },
+          "compactionReceipts": []
+        },
+        {
+          "id": "observer", "session": "observer@sample-ops", "role": "observer", "runtime": "claude-code",
+          "activity": "idle", "confidence": "stale",
+          "context": { "used": 12000, "window": 1000000, "observedAgoMs": 900000 },
+          "compactionReceipts": [
+            { "session": "observer@sample-ops", "entryId": "e-7", "status": "prepared" }
+          ]
+        }
+      ]
+    }
+  ],
+  "needsYou": [
+    { "id": "ny-1", "rigId": "sample-ops", "seatId": "operator", "summary": "Fixture rig needs a decision: <b>approve</b> the example step? This text is agent data, not an approval.", "sinceAgoMs": 300000 }
+  ]
+}

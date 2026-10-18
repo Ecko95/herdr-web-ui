@@ -1,3 +1,6 @@
+import { createOpenRigProvider } from "./motoko-reader.ts";
+import { OwnerError, OwnerStore, ownerConfiguration, ownerRequestAllowed, disabledOwnerRoute, ownerError, type OwnerConfig } from "./motoko-owner.ts";
+import { CoordinationError, createCoordination, curlQueue, rigSourceCheck, sourceBinding, type Coordination } from "./motoko-coordination.ts";
 import { readHerdrProfiles, type HerdrMachineProfile } from "./herdr-profiles.ts";
 import { randomBytes } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
@@ -15,7 +18,7 @@ import { handlePreferencesRequest, PreferenceStore } from "./preferences.ts";
 import { remoteAccess, TailnetIdentitySource } from "./tailscale.ts";
 import { paneCommands } from "./commands.ts";
 import { paneFiles } from "./files.ts";
-import { badRequest, conflictResponse, errorResponse, isCount, isJsonObject, jsonResponse } from "./http.ts";
+import { badRequest, conflictResponse, errorResponse as defaultErrorResponse, isCount, isJsonObject, jsonResponse } from "./http.ts";
 import { requestOrigin, serveStatic } from "./static.ts";
 import { compressResponse } from "./compress.ts";
 import { isMouseReport, sameAttachment } from "./input-guard.ts";
@@ -341,6 +344,8 @@ async function agentLaunch(paneId: string, agent: AgentPayload): Promise<{ agent
 }
 
 interface SocketData {
+  ownerSessionId?: string;
+  unwatchOwner?: () => void;
   deviceId?: string;
   readOnly?: boolean;
   revoked?: boolean;
@@ -442,8 +447,14 @@ export interface ServerInstance {
   stop: () => void;
 }
 
+function errorResponse(error: unknown): Response { return error instanceof OwnerError ? ownerError(error) : defaultErrorResponse(error); }
+
 export function createServer(
   options: {
+    owner?: OwnerConfig;
+    motokoProvider?: import("./motoko.ts").MotokoProvider;
+    /** Owner request coordination; tests pass one with a disposable queue. Unset, the environment binding decides. */
+    coordination?: Coordination | null;
     port?: number;
     hostname?: string;
     token?: string;
@@ -513,6 +524,17 @@ export function createServer(
     sidecar?: boolean;
   } = {},
 ): ServerInstance {
+  const ownerConfig = ownerConfiguration(options.owner);
+  const testOrigin = ownerConfig?.origin === "http://localhost:0";
+  if (testOrigin && (options.owner?.origin !== "http://localhost:0" || options.owner.rpId !== "localhost" || options.hostname !== "127.0.0.1" || options.port !== 0)) throw new Error("The test owner origin requires explicit loopback port zero");
+  let notifyOwnerFault = () => {};
+  const owner = ownerConfig ? new OwnerStore(ownerConfig, options.stateDir ?? defaultStateDir(), { onFault: () => notifyOwnerFault() }) : null;
+  const motokoEnv = { ...process.env };
+  const motokoProvider = options.motokoProvider ?? createOpenRigProvider(undefined, Date.now, motokoEnv);
+  // Owner requests to the orchestrator: enabled only by the exact registered source (HERDR_WEB_MOTOKO_SOURCE_SESSION)
+  // and its startup check; tests pass their own instance. Without owner mode there is no coordination at all.
+  const coordination: Promise<Coordination | null> = !owner ? Promise.resolve(null) : options.coordination !== undefined ? Promise.resolve(options.coordination)
+    : sourceBinding(motokoEnv, rigSourceCheck(motokoEnv)).then((binding) => createCoordination({ stateDir: options.stateDir ?? defaultStateDir(), binding, queue: curlQueue(), now: Date.now }));
   const attachments = new Map<string, PaneAttachment>();
   /** whether this bridge can `terminal attach`: herdr is asked once, and the PTY sidecar has to be runnable here (server/pty/sidecar.ts) */
   /** whether the sidecar can run, settled as the server starts so that attach, /api/health and /api/bridge tell one answer; a forced answer (tests) stands in for it */
@@ -795,7 +817,7 @@ export function createServer(
   }
 
   /** authorizeSocket as a test: may this connection type now? */
-  const mayType = (client: Client): boolean => clients.has(client) && !client.data.closing && !client.data.revoked
+  const mayType = (client: Client): boolean => clients.has(client) && !client.data.closing && !client.data.revoked && (!owner || !!client.data.ownerSessionId && !!owner.current(client.data.ownerSessionId))
     && !client.data.readOnly && client.data.mode !== "observe";
 
   function authorizeSocket(client: Client): void {
@@ -1221,8 +1243,8 @@ export function createServer(
   /** A pane's status frame: every one says whether the pane waits on its turn's background work. */
   const paneStatus = (paneId: string, status: AgentStatus, about: { background_tasks?: number; plan?: PlanSummary | null } = {}): ServerMessage =>
     ({ type: "pane-status", pane_id: paneId, agent_status: status, ...about, ...(waits.waiting(paneId) ? { background_wait: true as const } : {}) });
-  const machines = options.machines === false ? null : new MachineManager(options.stateDir ?? defaultStateDir(), push, completions, clientSnapshot);
-  if (machines && options.herdrProfiles) machines.watchHerdrProfiles(options.herdrProfiles);
+  const machines = !owner && options.machines === false ? null : new MachineManager(options.stateDir ?? defaultStateDir(), push, completions, clientSnapshot, { localOnly: owner !== null });
+  if (!owner && machines && options.herdrProfiles) machines.watchHerdrProfiles(options.herdrProfiles);
   const bridgeToken = randomBytes(32).toString("hex");
 
   function broadcast(paneId: string, message: ServerMessage): void {
@@ -1868,7 +1890,28 @@ export function createServer(
       return compressResponse(request, await (async (): Promise<Response | undefined> => {
       const url = new URL(request.url);
       let { pathname } = url;
-      const bridgeAuthorized = isAuthenticated(request, bridgeToken);
+      const mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+      let ownerSession = owner?.match(request, mutating) ?? null;
+      if (!owner && (pathname.startsWith("/api/owner/") || pathname.startsWith("/api/motoko/"))) return jsonResponse({ error: { code: "owner_gate_required", message: "Owner mode is required" } }, 404);
+      if (owner && (pathname.startsWith("/api/") || pathname === "/ws")) {
+        if ((mutating || pathname === "/ws") && !ownerRequestAllowed(request, owner.config)) return jsonResponse({ error: { code: "invalid_origin", message: "Use owner controls from this origin" } }, 403);
+        if (disabledOwnerRoute(pathname, url, request.method)) return jsonResponse({ error: { code: "disabled_in_owner_mode", message: "This route is disabled in owner mode" } }, 403);
+        if (pathname === "/api/health" && !ownerSession) return owner.redactedHealth();
+        const handled = await owner.handle(request, url, { ip: bunServer.requestIP(request)?.address ?? "unknown", userAgent: request.headers.get("user-agent") ?? "", client: authClient(bunServer.requestIP(request)?.address ?? null, request.headers) });
+        if (handled) return handled;
+        if (pathname === "/api/auth" && request.method === "DELETE") { try { return handleAuthRequest(request, token, null, () => owner.signOut(request)); } catch (error) { return ownerError(error); } }
+        ownerSession = owner.match(request, mutating);
+        if (!ownerSession) return owner.denied();
+      }
+      const checkOwner = (): void => {
+        if (owner && ownerSession) owner.assertCurrent(ownerSession.id);
+      };
+      if (owner && ownerSession && mutating && request.headers.get("content-type")?.includes("application/json")) {
+        const body = await request.arrayBuffer();
+        if (!owner.current(ownerSession.id)) return owner.denied();
+        request = new Request(request, { body });
+      }
+      const bridgeAuthorized = !owner && isAuthenticated(request, bridgeToken);
       const bridgePath = pathname === "/api/bridge" || pathname === "/api/session" || pathname === "/api/agents" || pathname === "/api/agent/rename" || pathname === "/api/integrations" || pathname === "/api/plugins/actions" || pathname === "/api/plugin/action" || pathname.startsWith("/api/pane/") || pathname.startsWith("/api/workspace/") || pathname.startsWith("/api/worktree/") || pathname.startsWith("/api/tab/") || pathname === "/api/layout/ratio" || pathname.startsWith("/api/fs/") || pathname === "/ws";
       const ip = bunServer.requestIP(request);
       const loopback = ip !== null && isLoopbackAddress(ip.address);
@@ -1879,7 +1922,7 @@ export function createServer(
       const requestHost = request.headers.get("host");
       // the guessing budget of the address that asks (auth.ts): a token presented while it waits is not compared
       const client = authClient(ip?.address ?? null, request.headers);
-      const presented = presentedToken(request, token, client);
+      const presented = owner ? "none" : presentedToken(request, token, client);
       // counted at once, before any await below lets a concurrent guess pass the same check. Every
       // wrong token counts, a paired watch device's too (a right one would upgrade it to drive);
       // the connection server's own bridge token does not
@@ -1887,14 +1930,14 @@ export function createServer(
       const tokenMatched = presented === "match";
       let pairedDevice: DeviceMatch | null;
       try {
-        pairedDevice = devices.match(parseCookies(request.headers.get("cookie")).get(DEVICE_COOKIE));
+        pairedDevice = owner ? null : devices.match(parseCookies(request.headers.get("cookie")).get(DEVICE_COOKIE));
       } catch (error) {
         // First-cookie confirmation is an authorization write, not best-effort telemetry.
         return errorResponse(error);
       }
       const requestShape = { loopback, forwarded, funnel, tailscaleLogin, forwardedFor, serveOnly };
-      const identity = await identityOf(token === "" && pairedDevice === null && isServeOwnerRequest(requestShape) && (pathname === "/ws" || pathname.startsWith("/api/")), requestHost);
-      const access = decideAccess({
+      const identity = owner ? { soleLogin: null, dnsName: null, tailnetIp: null, owner: null, tagged: false } : await identityOf(token === "" && pairedDevice === null && isServeOwnerRequest(requestShape) && (pathname === "/ws" || pathname.startsWith("/api/")), requestHost);
+      const access = owner ? { level: "full" as const, via: "owner" as const, role: "drive" as const } : decideAccess({
         ...requestShape,
         host: requestHost,
         tokenMatched,
@@ -1905,16 +1948,25 @@ export function createServer(
       });
       const authenticated = access.level === "full" || (bridgePath && bridgeAuthorized);
 
-      if (requiresAuth(pathname) && !authenticated) {
+      if (requiresAuth(pathname, owner !== null) && !authenticated) {
         // a script's Bearer guess is told to wait; a browser's cookie gets the usual 401 and its sign-in form
         if (presented === "held" && pathname !== "/ws" && request.headers.has("authorization")) return presentedTokenHeld(client);
         // The WS client never parses a body, so the upgrade refusal stays plain text.
         return pathname === "/ws" ? new Response("unauthorized", { status: 401 }) : unauthorizedJson(access.level === "none" ? access.reason : "token_required");
       }
 
+      if (pathname.startsWith("/api/motoko/")) {
+        const { handleMotokoRequest } = await import("./motoko.ts");
+        if (owner && (!ownerSession || !owner.current(ownerSession.id))) return owner.denied();
+        const session = ownerSession;
+        // the owner proof is this server's own session check, never a body field or header the browser chose
+        const ownerContext = owner && session ? { sessionId: session.id, origin: owner.config.origin, recheck: () => {
+          try { owner.assertCurrent(session.id); } catch { throw new CoordinationError("owner_required", 401); }
+        } } : null;
+        return handleMotokoRequest(request, url, { provider: motokoProvider, now: Date.now, coordination: owner ? await coordination : null, owner: ownerContext });
+      }
       const readOnly = access.level === "full" && access.role === "watch";
-      const mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-      if (pathname.startsWith("/api/") && mutating && !sameOrigin(request)) {
+      if (pathname.startsWith("/api/") && mutating && !owner && !sameOrigin(request)) {
         return jsonResponse({ error: { code: "invalid_origin", message: "Use controls from this app" } }, 403);
       }
       // An empty segment ("//") reads as another route to the checks below, while the PC proxy
@@ -1953,7 +2005,7 @@ export function createServer(
           // a worktree made with an agent waits on git and then agent.start, up to 150 s on the PC
           bunServer.timeout(request, pathname === "/api/machines/events" ? 0 : pathname.endsWith("/worktree/create") ? 180 : 80);
           const deviceId = access.level === "full" ? access.device?.id : undefined;
-          const response = await handleMachineRequest(request, machines, deviceId ? (close) => devices.onRevoke(deviceId, close) : undefined, preferences, readOnly);
+          const response = await handleMachineRequest(request, machines, owner && ownerSession ? (close) => owner.onRevoke(ownerSession.id, close) : deviceId ? (close) => devices.onRevoke(deviceId, close) : undefined, preferences, readOnly);
           response.headers.set("cache-control", "no-store");
           return response;
         }
@@ -1962,7 +2014,7 @@ export function createServer(
       // in charge rather than Bun's default 10 s idle cutoff. PC proxies have their own budget above.
       if (pathname === "/api/pane/read" || pathname === "/api/pane/conversation") bunServer.timeout(request, 60);
       if (pathname === "/ws") {
-        if (!sameOrigin(request)) return new Response("invalid origin", { status: 403 });
+        if (!(owner ? ownerRequestAllowed(request, owner.config) : sameOrigin(request))) return new Response("invalid origin", { status: 403 });
         const deviceId = access.level === "full" ? access.device?.id : undefined;
         const machineId = url.searchParams.get("machine_id");
         if (machineId && machineId !== "local") {
@@ -1978,7 +2030,7 @@ export function createServer(
           } catch { relay?.close(); return new Response("remote websocket unavailable", { status: 502 }); }
           return new Response("websocket upgrade required", { status: 426 });
         }
-        const upgraded = bunServer.upgrade(request, { data: { attached: new Map<string, { keepSize: boolean }>(), watches: new Map<string, PaneWatch>(), conversationInterests: new Set<string>(), mode: readOnly ? "observe" : "interact", output: new Map(), closing: false, roles: 0, deviceId, readOnly } });
+        const upgraded = bunServer.upgrade(request, { data: { attached: new Map<string, { keepSize: boolean }>(), watches: new Map<string, PaneWatch>(), conversationInterests: new Set<string>(), mode: readOnly ? "observe" : "interact", output: new Map(), closing: false, roles: 0, deviceId, readOnly, ownerSessionId: ownerSession?.id } });
         if (upgraded) return undefined as unknown as Response;
         return new Response("websocket upgrade required", { status: 426 });
       }
@@ -1986,7 +2038,7 @@ export function createServer(
       if (pathname === "/api/auth") return handleAuthRequest(request, token, client);
       if (pathname === "/api/devices" || pathname.startsWith("/api/devices/")) {
         try {
-          const response = await handleDeviceRequest(request, pathname, devices, access);
+          const response = await (checkOwner(), handleDeviceRequest(request, pathname, devices, access));
           if (request.method === "DELETE" && response.status === 204) {
             // The device registry is the delivery authority even if cleaning the push file fails.
             try { push.revokeDevice(pathname.slice("/api/devices/".length)); } catch (error) { logPushError(error); }
@@ -1996,21 +2048,21 @@ export function createServer(
       }
 
       if (pathname === "/api/updates" || pathname.startsWith("/api/updates/")) {
-        return handleUpdateRequest(request, pathname, options.updates);
+        return (checkOwner(), handleUpdateRequest(request, pathname, options.updates));
       }
-      if (pathname === "/api/herdr/update") return handleHerdrUpdateRequest(request, options.herdrUpdate);
+      if (pathname === "/api/herdr/update") return (checkOwner(), handleHerdrUpdateRequest(request, options.herdrUpdate));
       if (pathname === "/api/portal" || pathname.startsWith("/api/portal/")) {
         return handlePortalRequest(request, pathname, options.portal, { port: bunServer.port ?? DEFAULT_PORT, tokenSet: token !== "", serveOnly });
       }
-      if (pathname === "/api/telemetry") return handleTelemetryRequest(request, options.telemetry);
+      if (pathname === "/api/telemetry") return (checkOwner(), handleTelemetryRequest(request, options.telemetry));
       // what every browser of this server shares; a watching device reads it and cannot change it (above)
-      if (pathname === "/api/preferences") return handlePreferencesRequest(request, preferences);
+      if (pathname === "/api/preferences") return (checkOwner(), handlePreferencesRequest(request, preferences));
 
-      if (pathname === "/api/usage") return handleUsageRequest(request, url, usage);
-      if (pathname === "/api/usage/login") { bunServer.timeout(request, 30); return usageLogin.handle(request); }
-      if (pathname === "/api/cliproxy" || pathname.startsWith("/api/cliproxy/")) { bunServer.timeout(request, 60); return cliProxyRoutes.handle(request); }
+      if (pathname === "/api/usage") return (checkOwner(), handleUsageRequest(request, url, usage));
+      if (pathname === "/api/usage/login") { bunServer.timeout(request, 30); return (checkOwner(), usageLogin.handle(request)); }
+      if (pathname === "/api/cliproxy" || pathname.startsWith("/api/cliproxy/")) { bunServer.timeout(request, 60); return (checkOwner(), cliProxyRoutes.handle(request)); }
       // a long clip can keep the provider silent past Bun's 10 s idle limit before the first line
-      if (pathname === "/api/voice" || pathname.startsWith("/api/voice/")) { bunServer.timeout(request, 120); return handleVoiceRequest(request, pathname, voice); }
+      if (pathname === "/api/voice" || pathname.startsWith("/api/voice/")) { bunServer.timeout(request, 120); return (checkOwner(), handleVoiceRequest(request, pathname, voice, ownerSession && owner ? AbortSignal.any([request.signal, owner.signal(ownerSession.id)]) : request.signal)); }
 
       if (pathname === "/api/push" || pathname.startsWith("/api/push/")) {
         try {
@@ -2018,7 +2070,7 @@ export function createServer(
           // it stays open, like a subscription from before owners (undefined); a local/token/
           // Tailscale sign-in is the owner (null)
           const owner = access.level !== "full" ? null : access.device?.id ?? (access.via === "open" ? undefined : null);
-          const answered = await handlePushRequest(request, pathname, push, owner);
+          const answered = await (checkOwner(), handlePushRequest(request, pathname, push, owner));
           if (answered) return answered;
         } catch (error) {
           return errorResponse(error);
@@ -2027,7 +2079,7 @@ export function createServer(
 
       if (pathname === "/api/health") {
         const auth: HealthAuth = access.level === "full"
-          ? { required: false, authenticated: true, via: access.via, role: access.role, ...(access.via === "token" && bearerMatches(request, token) ? { bearer: true as const } : {}) }
+          ? { required: owner !== null, authenticated: true, ...(owner ? { owner: { enrolled: owner.enrolled } } : {}), via: access.via, role: access.role, ...(access.via === "token" && bearerMatches(request, token) ? { bearer: true as const } : {}) }
           : { required: true, authenticated, ...(authenticated ? {} : { reason: access.reason }) };
         // this server is open to the network with no token and nothing paired, told to a client
         // that got in and to nobody else: naming it to an anonymous caller would be
@@ -2108,7 +2160,7 @@ export function createServer(
         try { payload = await request.json(); } catch { return badRequest("invalid_json", "request body must be JSON"); }
         if (!isJsonObject(payload) || typeof payload["path"] !== "string" || typeof payload["name"] !== "string") return badRequest("invalid_body", "path and name must be strings");
         let made;
-        try { made = createDirectory(payload["path"], payload["name"]); } catch (error) { return errorResponse(error); }
+        try { made = (checkOwner(), createDirectory(payload["path"], payload["name"])); } catch (error) { return errorResponse(error); }
         if ("path" in made) return jsonResponse({ path: made.path } satisfies DirectoryCreated, 201);
         if (made.error === "folder_exists") return conflictResponse("folder_exists", "a file or folder with that name is already there");
         if (made.error === "permission_denied") return jsonResponse({ error: { code: "permission_denied", message: "this user cannot make a folder there" } }, 403);
@@ -2197,13 +2249,13 @@ export function createServer(
             ...(typeof payload.label === "string" ? { label: payload.label } : {}),
           };
           const created = inWorkspace
-            ? await tabCreate({ ...options, workspaceId: payload.workspace_id as string })
-            : await workspaceCreate(options);
+            ? await (checkOwner(), tabCreate({ ...options, workspaceId: payload.workspace_id as string }))
+            : await (checkOwner(), workspaceCreate(options));
           const workspaceId = created.tab.workspace_id;
           if (!payload.agent) {
             return jsonResponse({ workspace_id: workspaceId, pane_id: created.root_pane.pane_id, agent_started: false });
           }
-          return jsonResponse({ workspace_id: workspaceId, pane_id: created.root_pane.pane_id, ...(await agentLaunch(created.root_pane.pane_id, payload.agent)) });
+          return jsonResponse({ workspace_id: workspaceId, pane_id: created.root_pane.pane_id, ...(await (checkOwner(), agentLaunch(created.root_pane.pane_id, payload.agent))) });
         } catch (error) {
           return errorResponse(error);
         }
@@ -2239,7 +2291,7 @@ export function createServer(
         // git can take a while to delete a large checkout; Bun's default idle timeout is shorter.
         bunServer.timeout(request, 75);
         try {
-          const removed = await worktreeRemove(payload.workspace_id, payload.force === true);
+          const removed = await (checkOwner(), worktreeRemove(payload.workspace_id, payload.force === true));
           // herdr closed the worktree's workspace: tell clients now, as the workspace close route does
           broadcastAll({ type: "session-changed" });
           return jsonResponse({ ok: true, path: removed.path, forced: removed.forced });
@@ -2294,8 +2346,8 @@ export function createServer(
         try {
           const asked = payload.workspace_id;
           const from = (workspaceId: string) => creating
-            ? worktreeCreate({ workspaceId, branch: branch as string, base, label, path })
-            : worktreeOpen({ workspaceId, path, branch, label });
+            ? (checkOwner(), worktreeCreate({ workspaceId, branch: branch as string, base, label, path }))
+            : (checkOwner(), worktreeOpen({ workspaceId, path, branch, label }));
           // herdr starts a worktree only from the workspace on the repository's main checkout. Asked
           // from a workspace on another checkout (herdr does not mark one it did not open as a
           // worktree, so the row offers the action), the call goes to that workspace when it is open.
@@ -2311,7 +2363,7 @@ export function createServer(
             already_open: opened.already_open === true,
             path: opened.worktree.path,
             branch: opened.worktree.branch,
-            ...(agent ? await agentLaunch(opened.root_pane.pane_id, agent) : {}),
+            ...(agent ? await (checkOwner(), agentLaunch(opened.root_pane.pane_id, agent)) : {}),
           });
         } catch (error) {
           // git's own words for a branch that has no commit yet (a folder just `git init`ed): with no
@@ -2349,9 +2401,9 @@ export function createServer(
           return badRequest("invalid_index", "insert_index must be a non-negative integer");
         }
         try {
-          if (pathname === "/api/workspace/rename") await workspaceRename(payload.workspace_id, payload.label as string);
-          else if (pathname === "/api/workspace/move") await workspaceMove(payload.workspace_id, payload.insert_index as number);
-          else await workspaceClose(payload.workspace_id, undefined, payload.close_group === true);
+          if (pathname === "/api/workspace/rename") await (checkOwner(), workspaceRename(payload.workspace_id, payload.label as string));
+          else if (pathname === "/api/workspace/move") await (checkOwner(), workspaceMove(payload.workspace_id, payload.insert_index as number));
+          else await (checkOwner(), workspaceClose(payload.workspace_id, undefined, payload.close_group === true));
           // a closed workspace's panes send no exit: without this, clients learn of it only after
           // the collector's structure debounce, and the closed workspace stays on screen meanwhile
           if (pathname === "/api/workspace/close") broadcastAll({ type: "session-changed" });
@@ -2377,7 +2429,7 @@ export function createServer(
         }
         try {
           if (pathname === "/api/tab/move") {
-            const moved = await tabMove(payload.tab_id, payload.insert_index as number);
+            const moved = await (checkOwner(), tabMove(payload.tab_id, payload.insert_index as number));
             broadcastAll({ type: "session-changed" });
             return jsonResponse({ ok: true, tabs: moved.tabs } satisfies TabMoved);
           }
@@ -2386,12 +2438,12 @@ export function createServer(
             const label = typeof payload.label === "string" ? payload.label.trim() : "";
             if (label === "") return badRequest("missing_label", "label is required");
             if (label.length > MAX_LABEL_CHARS) return badRequest("label_too_long", `label must be at most ${MAX_LABEL_CHARS} characters`);
-            await tabRename(payload.tab_id, label);
+            await (checkOwner(), tabRename(payload.tab_id, label));
             // no pane event follows a rename, so the clients are told here
             broadcastAll({ type: "session-changed" });
           } else {
             // herdr emits pane.closed for the tab's panes, and the collector tells the clients
-            await tabClose(payload.tab_id);
+            await (checkOwner(), tabClose(payload.tab_id));
           }
           return jsonResponse({ ok: true });
         } catch (error) {
@@ -2481,7 +2533,7 @@ export function createServer(
         if (typeof payload.pane_id !== "string" || payload.pane_id.length === 0) return badRequest("missing_pane_id", "pane_id is required");
         if (typeof payload.label !== "string") return badRequest("missing_label", "label is required");
         try {
-          await paneRename(payload.pane_id, payload.label.length === 0 ? null : payload.label);
+          await (checkOwner(), paneRename(payload.pane_id, payload.label.length === 0 ? null : payload.label));
           return jsonResponse({ ok: true });
         } catch (error) {
           return errorResponse(error);
@@ -2501,7 +2553,7 @@ export function createServer(
         if (payload.name !== null && typeof payload.name !== "string") return badRequest("invalid_name", "name must be a string, or null to clear it");
         // the rule and the uniqueness are herdr's: its refusal comes back as it is
         try {
-          await agentRename(payload.pane_id, payload.name);
+          await (checkOwner(), agentRename(payload.pane_id, payload.name));
           return jsonResponse({ ok: true });
         } catch (error) {
           return errorResponse(error);
@@ -2648,7 +2700,7 @@ export function createServer(
         if (typeof payload.pane_id !== "string" || payload.pane_id.length === 0) return badRequest("missing_pane_id", "pane_id is required");
         if (!isCount(payload.offset_from_bottom)) return badRequest("invalid_offset", "offset_from_bottom must be a non-negative integer");
         try {
-          return jsonResponse({ scroll: await paneScroll(payload.pane_id, payload.offset_from_bottom) });
+          return jsonResponse({ scroll: await (checkOwner(), paneScroll(payload.pane_id, payload.offset_from_bottom)) });
         } catch (error) {
           return errorResponse(error);
         }
@@ -2738,10 +2790,10 @@ export function createServer(
         try {
           if (pathname === "/api/pane/input") {
             if (typeof payload.text !== "string") return badRequest("missing_text", "text is required");
-            await paneSendText(payload.pane_id, payload.text);
+            await (checkOwner(), paneSendText(payload.pane_id, payload.text));
           } else {
             if (!Array.isArray(payload.keys) || !payload.keys.every((key) => typeof key === "string")) return badRequest("missing_keys", "keys must be an array");
-            await paneSendKeys(payload.pane_id, payload.keys);
+            await (checkOwner(), paneSendKeys(payload.pane_id, payload.keys));
           }
           return jsonResponse({ ok: true });
         } catch (error) {
@@ -2762,7 +2814,7 @@ export function createServer(
         try {
           // herdr emits pane.closed -> the collector broadcasts session-changed, so
           // every client refetches and the pane leaves sidebars on its own
-          await paneClose(payload.pane_id);
+          await (checkOwner(), paneClose(payload.pane_id));
           // the pane is gone: whatever its chat parsed is released with it (server/conversation.ts)
           forgetPaneTranscriptState(payload.pane_id);
           return jsonResponse({ ok: true });
@@ -2781,7 +2833,7 @@ export function createServer(
         if (!Array.isArray(payload.path) || !payload.path.every((step) => typeof step === "boolean")) return badRequest("invalid_path", "path must be an array of booleans");
         if (typeof payload.ratio !== "number" || !Number.isFinite(payload.ratio) || payload.ratio < 0.1 || payload.ratio > 0.9) return badRequest("invalid_ratio", "ratio must be a number from 0.1 to 0.9");
         try {
-          await layoutSetSplitRatio(payload.tab_id, payload.path, payload.ratio);
+          await (checkOwner(), layoutSetSplitRatio(payload.tab_id, payload.path, payload.ratio));
           return jsonResponse({ ok: true });
         } catch (error) { return errorResponse(error); }
       }
@@ -2804,22 +2856,22 @@ export function createServer(
         const paneId = payload.pane_id;
         try {
           if (pathname === "/api/pane/focus") {
-            await paneFocus(paneId);
+            await (checkOwner(), paneFocus(paneId));
             return jsonResponse({ ok: true });
           }
           if (pathname === "/api/pane/split") {
             if (payload.direction !== "right" && payload.direction !== "down") return badRequest("invalid_direction", "direction must be right or down");
             if (payload.focus !== undefined && typeof payload.focus !== "boolean") return badRequest("invalid_focus", "focus must be a boolean");
-            const pane = await paneSplit(paneId, payload.direction, payload.focus === true);
+            const pane = await (checkOwner(), paneSplit(paneId, payload.direction, payload.focus === true));
             return jsonResponse({ ok: true, pane } satisfies PaneSplit);
           }
           if (pathname === "/api/pane/zoom") {
             if (payload.mode !== undefined && payload.mode !== "toggle" && payload.mode !== "on" && payload.mode !== "off") return badRequest("invalid_mode", "mode must be toggle, on or off");
-            const zoom = await paneZoom(paneId, payload.mode ?? "toggle");
+            const zoom = await (checkOwner(), paneZoom(paneId, payload.mode ?? "toggle"));
             return jsonResponse({ ok: true, zoomed: zoom.zoomed, changed: zoom.changed, reason: zoom.reason } satisfies PaneZoomed);
           }
           if (pathname === "/api/pane/clear") {
-            await paneClear(paneId);
+            await (checkOwner(), paneClear(paneId));
             return jsonResponse({ ok: true });
           }
           if (pathname === "/api/pane/swap") {
@@ -2828,8 +2880,8 @@ export function createServer(
               if (typeof payload.target_pane_id !== "string" || !payload.target_pane_id.trim()) return badRequest("invalid_target_pane_id", "target_pane_id must be a non-empty string");
             } else if (!isPaneDirection(payload.direction)) return badRequest("invalid_direction", "direction must be left, right, up or down");
             const swap = typeof payload.target_pane_id === "string"
-              ? await paneSwapWith(paneId, payload.target_pane_id)
-              : await paneSwap(paneId, payload.direction as PaneDirection);
+              ? await (checkOwner(), paneSwapWith(paneId, payload.target_pane_id))
+              : await (checkOwner(), paneSwap(paneId, payload.direction as PaneDirection));
             return jsonResponse({ ok: true, changed: swap.changed, reason: swap.reason, target_pane_id: swap.target_pane_id } satisfies PaneSwapped);
           }
           if (!isPaneDirection(payload.direction)) return badRequest("invalid_direction", "direction must be left, right, up or down");
@@ -2838,7 +2890,7 @@ export function createServer(
           if (payload.amount !== undefined && !(typeof payload.amount === "number" && Number.isFinite(payload.amount) && payload.amount > 0 && payload.amount <= 0.5)) {
             return badRequest("invalid_amount", "amount must be a number above 0 and at most 0.5");
           }
-          const resize = await paneResize(paneId, payload.direction, payload.amount);
+          const resize = await (checkOwner(), paneResize(paneId, payload.direction, payload.amount));
           return jsonResponse({ ok: true, changed: resize.changed, reason: resize.reason } satisfies PaneResized);
         } catch (error) {
           return errorResponse(error);
@@ -2862,12 +2914,12 @@ export function createServer(
           return badRequest("invalid_image", "content_type, data_base64 and name must be strings");
         }
         try {
-          const path = await savePaneImage({
+          const path = await (checkOwner(), savePaneImage({
             paneId: payload.pane_id,
             contentType: payload.content_type ?? "",
             dataBase64: payload.data_base64 ?? "",
             name: payload.name,
-          });
+          }));
           return jsonResponse({ ok: true, path });
         } catch (error) {
           if (error instanceof PasteImageError) {
@@ -2879,7 +2931,7 @@ export function createServer(
 
       if (pathname.startsWith("/api/pane/prompt")) {
         try {
-          const response = await handlePromptRequest(request, url, { serialize, codexHome: options.codexHome, claudeTranscript: (paneId) => claudeAgents.sessionOf(paneId)?.path ?? null, readOnly });
+          const response = await (checkOwner(), handlePromptRequest(request, url, { serialize, codexHome: options.codexHome, claudeTranscript: (paneId) => claudeAgents.sessionOf(paneId)?.path ?? null, readOnly }));
           if (response) return response;
         } catch (error) {
           return errorResponse(error);
@@ -2892,7 +2944,7 @@ export function createServer(
 
       // static client - public even when the API is gated, so the login UI can load
       return serveStatic(pathname, request.headers.get("accept-encoding"), requestOrigin(request));
-      })());
+      })().catch((error: unknown) => { if (error instanceof OwnerError) return ownerError(error); throw error; }));
     },
 
     websocket: {
@@ -2903,6 +2955,16 @@ export function createServer(
         for (const paneId of client.data.attached.keys()) reconcileOutput(paneId);
       },
       async open(client) {
+        if (owner && client.data.ownerSessionId) {
+          client.data.unwatchOwner = owner.onRevoke(client.data.ownerSessionId, () => {
+            client.data.revoked = true; client.data.closing = true;
+            killWatches(client); clients.delete(client); present.delete(client);
+            for (const paneId of client.data.attached.keys()) detach(paneId, client);
+            client.data.attached.clear(); client.data.conversationInterests.clear(); client.data.output.clear();
+            client.close(1008, "Owner access revoked");
+          });
+          if (client.data.revoked) return;
+        }
         if (client.data.deviceId) {
           client.data.unwatchDevice = devices.onRevoke(client.data.deviceId, () => {
             client.data.revoked = true;
@@ -2933,6 +2995,7 @@ export function createServer(
 
       async message(client, raw) {
         if (stopped || client.data.closing) return;
+        if (owner && (!client.data.ownerSessionId || !owner.current(client.data.ownerSessionId))) { client.close(1008, "Owner access revoked"); return; }
         // read here for a relayed connection too: alerts for every PC go out from this server
         const presence = presenceOf(raw);
         if (presence === true) {
@@ -2949,6 +3012,9 @@ export function createServer(
           return;
         }
         try {
+          if (owner && client.data.ownerSessionId && ["input", "keys", "submit", "secret"].includes(message.type)) {
+            if (!owner.current(client.data.ownerSessionId, true)) { client.close(1008, "Owner access revoked"); return; }
+          }
           switch (message.type) {
             // liveness only: any role, no herdr call, nothing to wait behind
             case "ping": {
@@ -3395,9 +3461,9 @@ export function createServer(
                       await paneSendKeys(message.pane_id, ["Enter"], undefined, allowed);
                     } catch (error) {
                       if (!(error instanceof HerdrError && error.code === "cancelled")) throw error;
-                      // Cleanup is deliberately unguarded: do not leave the secret for another Enter.
+                      // Cleanup requires current authority, like the original secret write.
                       // Raw-mode readers may receive these bytes without erasing their own buffer.
-                      await paneSendKeys(message.pane_id, Array(message.secret.length).fill("Backspace"));
+                      await paneSendKeys(message.pane_id, Array(message.secret.length).fill("Backspace"), undefined, () => mayType(client));
                       result(false, client.data.closing || client.data.roles !== roles
                         ? "read_only" : "not_attached");
                       return;
@@ -3601,6 +3667,7 @@ export function createServer(
       },
 
       close(client) {
+        client.data.unwatchOwner?.();
         client.data.unwatchDevice?.();
         client.data.closing = true;
         present.delete(client);
@@ -3616,7 +3683,9 @@ export function createServer(
     },
   });
 
-  if (options.portal) {
+  if (testOrigin) owner!.resolveTestOrigin(server.port!);
+
+  if (!owner && options.portal) {
     let resume: Promise<void>;
     try {
       resume = options.portal.resume({ port: server.port ?? DEFAULT_PORT, tokenSet: token !== "", serveOnly });
@@ -3631,7 +3700,20 @@ export function createServer(
     settlePortalStartup({ ok: true });
   }
 
-  const registration = options.registerBridge ? registerBridge(server.port ?? 0, bridgeToken) : null;
+  const registration = !owner && options.registerBridge ? registerBridge(server.port ?? 0, bridgeToken) : null;
+
+  const privateBootId = process.env["HERDR_WEB_BOOT_ID"];
+  const privateManaged = owner !== null && process.env["HERDR_WEB_MANAGED"] === "1" && !!privateBootId && typeof process.send === "function";
+  let privateReady = false;
+  const reportPrivateReadiness = (status: "ready" | "failed") => {
+    try { process.send?.({ type: "bridge-ready", protocol: 1, owner: true, boot_id: privateBootId, port: server.port, status }); } catch { /* parent exited */ }
+  };
+  notifyOwnerFault = () => { if (privateManaged) { privateReady = false; reportPrivateReadiness("failed"); } };
+  if (privateManaged && owner!.fault) notifyOwnerFault();
+  else if (privateManaged) void collector.ready.then(async () => {
+    await ping();
+    if (!stopped) { privateReady = !owner!.fault; reportPrivateReadiness(privateReady ? "ready" : "failed"); }
+  }).catch(() => { if (!stopped) reportPrivateReadiness("failed"); });
 
   // ACKs can stop arriving entirely (a suspended tab). Bound the pause even then.
   const outputTimer = setInterval(() => {
@@ -3647,6 +3729,8 @@ export function createServer(
     alertsSettled: () => push.settled(),
     stop: () => {
       stopped = true;
+      if (privateManaged && privateReady) { privateReady = false; reportPrivateReadiness("failed"); }
+      owner?.close();
       settlePortalStartup({ ok: false, error: new Error("Server stopped before Portal startup cleanup completed") });
       conversations.stop();
       clearInterval(outputTimer);
@@ -3657,7 +3741,7 @@ export function createServer(
       clearInterval(waitTimer);
       plans.stop();
       machines?.stop();
-      void options.portal?.shutdown();
+      if (!owner) void options.portal?.shutdown();
       registration?.close();
       for (const client of clients) killWatches(client);
       for (const paneId of [...attachments.keys()]) closeAttachment(paneId);
@@ -3667,6 +3751,7 @@ export function createServer(
 }
 
 if (import.meta.main) {
+  try { ownerConfiguration(); } catch { console.error("Invalid owner configuration"); process.exit(1); }
   const updates = connectUpdater();
   const version = (JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")) as { version: string }).version;
   const telemetry = new Telemetry({ stateDir: defaultStateDir(), version, env: process.env, fetch, previousVersion: () => updates.installed().previous_version });

@@ -1,0 +1,18 @@
+{
+  "sampledAgoMs": 1000,
+  "staleAfterMs": 120000,
+  "rigs": [
+    {
+      "id": "sample-context", "name": "sample-context", "domain": "personal",
+      "seats": [
+        { "id": "a", "session": "a@sample-context", "role": "builder", "runtime": "codex", "activity": "working", "confidence": "oracle",
+          "context": { "used": 84000, "window": 200000, "observedAgoMs": 1000 }, "compactionReceipts": [] },
+        { "id": "b", "session": "b@sample-context", "role": "builder", "runtime": "codex", "activity": "working", "confidence": "oracle",
+          "context": { "used": 84000, "window": null, "observedAgoMs": 1000 }, "compactionReceipts": [] },
+        { "id": "c", "session": "c@sample-context", "role": "builder", "runtime": "codex", "activity": "working", "confidence": "oracle",
+          "context": { "used": null, "window": null, "observedAgoMs": null }, "compactionReceipts": [] }
+      ]
+    }
+  ],
+  "needsYou": []
+}
