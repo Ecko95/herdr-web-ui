@@ -10,6 +10,18 @@
  * Placeholders in braces keep their English names.
  */
 export const ZH: Record<string, string> = {
+  "VPS health": "VPS 健康状态",
+  "cpu vps memory uptime health": "cpu vps 内存 运行时间 健康状态",
+  "Health sample pending.": "正在等待健康状态样本。",
+  "VPS health: the server that hosts this app. Remote PCs and rigs are not included.": "VPS 健康状态：托管此应用的服务器。不包括远程电脑和 rig。",
+  "CPU utilization": "CPU 使用率",
+  "{percent}% over {ms} ms": "{ms} 毫秒内为 {percent}%",
+  "Memory use (includes caches)": "内存用量（包括缓存）",
+  "{used} of {total} bytes": "{used} / {total} 字节",
+  "Server uptime": "服务器运行时间",
+  "{seconds} seconds": "{seconds} 秒",
+  "Three active logins already exist. Revoke an old login from a device that is signed in.": "已有三个有效登录。请在已登录的设备上撤销一个旧登录。",
+
   "Could not load sign-in options": "无法加载登录方式",
   "On the server PC": "在服务器 PC 上登录",
   "Install {cli} on the server PC first.": "请先在服务器 PC 上安装 {cli}。",

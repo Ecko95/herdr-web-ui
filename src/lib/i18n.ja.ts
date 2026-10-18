@@ -8,6 +8,18 @@
  * in English. Placeholders in braces keep their English names.
  */
 export const JA: Record<string, string> = {
+  "VPS health": "VPS の状態",
+  "cpu vps memory uptime health": "cpu vps メモリ 稼働時間 状態",
+  "Health sample pending.": "状態のサンプルを待っています。",
+  "VPS health: the server that hosts this app. Remote PCs and rigs are not included.": "VPS の状態: このアプリを実行するサーバーです。リモート PC とリグは含みません。",
+  "CPU utilization": "CPU 使用率",
+  "{percent}% over {ms} ms": "{ms} ms 間で {percent}%",
+  "Memory use (includes caches)": "メモリ使用量（キャッシュを含む）",
+  "{used} of {total} bytes": "{total} バイト中 {used}",
+  "Server uptime": "サーバー稼働時間",
+  "{seconds} seconds": "{seconds} 秒",
+  "Three active logins already exist. Revoke an old login from a device that is signed in.": "有効なログインがすでに 3 つあります。ログイン済みの端末から古いログインを取り消してください。",
+
   "Could not load sign-in options": "ログイン方法を読み込めませんでした",
   "On the server PC": "サーバーPCでログイン",
   "Install {cli} on the server PC first.": "先にサーバーPCに{cli}をインストールしてください。",

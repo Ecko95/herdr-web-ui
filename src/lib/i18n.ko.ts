@@ -6,6 +6,18 @@
  * braces keep their English names.
  */
 export const KO: Record<string, string> = {
+  "VPS health": "VPS 상태",
+  "cpu vps memory uptime health": "cpu vps 메모리 가동 시간 상태",
+  "Health sample pending.": "상태 표본을 기다립니다.",
+  "VPS health: the server that hosts this app. Remote PCs and rigs are not included.": "VPS 상태: 이 앱을 호스팅하는 서버입니다. 원격 PC와 리그는 포함하지 않습니다.",
+  "CPU utilization": "CPU 사용률",
+  "{percent}% over {ms} ms": "{ms} ms 동안 {percent}%",
+  "Memory use (includes caches)": "메모리 사용량 (캐시 포함)",
+  "{used} of {total} bytes": "{total} 바이트 중 {used}",
+  "Server uptime": "서버 가동 시간",
+  "{seconds} seconds": "{seconds}초",
+  "Three active logins already exist. Revoke an old login from a device that is signed in.": "이미 활성 로그인이 세 개 있습니다. 로그인된 기기에서 이전 로그인을 해지하세요.",
+
   "Could not load sign-in options": "로그인 방법을 불러오지 못했습니다",
   "On the server PC": "서버 PC에서 로그인",
   "Install {cli} on the server PC first.": "먼저 서버 PC에 {cli}를 설치하세요.",

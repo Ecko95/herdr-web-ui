@@ -72,9 +72,9 @@ describe("Motoko destinations", () => {
   it("offers only real owner destinations and routes each action", () => {
     const opened: string[] = [];
     const entries = motokoEntries(identity, (destination) => opened.push(destination));
-    expect(entries.map((entry) => entry.id)).toEqual(["motoko", "motoko-status", "motoko-requests", "motoko-sessions", "motoko-passkey"]);
+    expect(entries.map((entry) => entry.id)).toEqual(["motoko", "motoko-status", "motoko-health", "motoko-requests", "motoko-sessions", "motoko-passkey"]);
     for (const entry of entries) entry.run();
-    expect(opened).toEqual(["boot", "status", "requests", "sessions", "passkey"]);
+    expect(opened).toEqual(["boot", "status", "health", "requests", "sessions", "passkey"]);
     expect(motokoEntries(identity, null)).toEqual([]);
   });
 
@@ -85,4 +85,15 @@ describe("Motoko destinations", () => {
     for (const word of ["security", "devices", "sessions"]) expect(rankByTitle(word, rows)).toContain("motoko-sessions");
     expect(rankByTitle("credentials", rows)).toContain("motoko-passkey");
   });
+});
+
+it("CPU and VPS aliases open the real health destination", () => {
+  const opened: string[] = [], entries = motokoEntries((key) => key, destination => opened.push(destination));
+  const aliases = actionAliases((key) => key);
+  const rows = entries.map(entry => ({item:entry, title:entry.label, aliases:aliases[entry.id]}));
+  for (const query of ["cpu","vps","memory","uptime","health"]) {
+    const hit = rankByTitle(query,rows).find(entry => entry.id === "motoko-health");
+    expect(hit).toBeDefined(); hit!.run();
+  }
+  expect(opened).toEqual(["health","health","health","health","health"]);
 });

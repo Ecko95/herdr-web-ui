@@ -78,3 +78,12 @@ export function sampleAge(status: Pick<MotokoStatus, "sampledAt" | "staleAfterMs
   // an unreadable time is no proof of freshness
   return { ageMs, stale: !(ageMs <= status.staleAfterMs) };
 }
+
+/** Aggregate metrics for the operating system that hosts this app. */
+export interface MotokoHealth {
+  sampledAt: string;
+  staleAfterMs: number;
+  cpu: Known<{ percent: number; intervalMs: number }>;
+  memory: Known<{ usedBytes: number; totalBytes: number }>;
+  uptime: Known<number>;
+}

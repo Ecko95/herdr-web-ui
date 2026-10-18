@@ -12,12 +12,12 @@ import { KeyRound, LogOut, RefreshCw, Send, X } from "lucide-react";
 
 import "./Motoko.css";
 
-import { MOTOKO_REQUEST_TEXT_MAX, occupancy, sampleAge, type Activity, type Known, type MotokoRequests, type MotokoRequestView, type MotokoSeat, type MotokoStatus } from "../../shared/motoko.ts";
+import { MOTOKO_REQUEST_TEXT_MAX, occupancy, sampleAge, type Activity, type Known, type MotokoHealth, type MotokoRequests, type MotokoRequestView, type MotokoSeat, type MotokoStatus } from "../../shared/motoko.ts";
 import type { MotokoDestination, MotokoRequest } from "../lib/actions.ts";
 import { deviceLabel } from "../lib/phone.ts";
 import { ApiError } from "../lib/api.ts";
 import { currentLocale, useT } from "../lib/i18n.ts";
-import { addPasskey, cancelCeremony, ceremonyCanceled, fetchMotokoRequests, fetchMotokoStatus, fetchOwnerSessions, ownerErrorMessage, ownerMode, revokeOwnerCredential, revokeOwnerSession, submitMotokoRequest, type OwnerAuth, type OwnerSessions } from "../lib/motoko.ts";
+import { addPasskey, cancelCeremony, ceremonyCanceled, fetchMotokoHealth, fetchMotokoRequests, fetchMotokoStatus, fetchOwnerSessions, ownerErrorMessage, ownerMode, revokeOwnerCredential, revokeOwnerSession, submitMotokoRequest, type OwnerAuth, type OwnerSessions } from "../lib/motoko.ts";
 import { MotokoBoot } from "./MotokoBoot.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
@@ -63,6 +63,7 @@ export function Motoko({ auth, request, onClose, onSignOut, onSessionEnded }: Mo
         <div className="motoko-tabs" role="tablist" aria-label={t("Motoko views")}>
           <button type="button" role="tab" aria-selected={tab === "boot"} className="btn btn-ghost" onClick={() => setTab("boot")}>{t("Boot")}</button>
           <button type="button" role="tab" aria-selected={tab === "status"} className="btn btn-ghost" onClick={() => setTab("status")}>{t("Status")}</button>
+          <button type="button" role="tab" aria-selected={tab === "health"} className="btn btn-ghost" onClick={() => setTab("health")}>{t("VPS health")}</button>
           <button type="button" role="tab" aria-selected={tab === "requests"} className="btn btn-ghost" onClick={() => setTab("requests")}>{t("Requests")}</button>
           <button type="button" role="tab" aria-selected={tab === "access"} className="btn btn-ghost" onClick={() => setTab("sessions")}>{t("Access")}</button>
         </div>
@@ -70,8 +71,54 @@ export function Motoko({ auth, request, onClose, onSignOut, onSessionEnded }: Mo
       </header>
       {!owner
         ? <p className="motoko-note" role="status">{t("Motoko needs owner passkey sign-in on this server. It shows nothing without it.")}</p>
-        : tab === "boot" ? <MotokoBoot onStatus={() => setTab("status")} onSessionEnded={onSessionEnded} /> : tab === "status" ? <StatusView onSessionEnded={onSessionEnded} /> : tab === "requests" ? <RequestsView onSessionEnded={onSessionEnded} /> : <AccessView request={selected} onSignOut={onSignOut} onSessionEnded={onSessionEnded} />}
+        : tab === "boot" ? <MotokoBoot onStatus={() => setTab("status")} onSessionEnded={onSessionEnded} /> : tab === "status" ? <StatusView onSessionEnded={onSessionEnded} /> : tab === "health" ? <HealthView onSessionEnded={onSessionEnded} /> : tab === "requests" ? <RequestsView onSessionEnded={onSessionEnded} /> : <AccessView request={selected} onSignOut={onSignOut} onSessionEnded={onSessionEnded} />}
     </section>
+  );
+}
+
+function HealthView({ onSessionEnded }: { onSessionEnded: () => void }) {
+  const t = useT();
+  const age = useAge();
+  const sessionEnded = useRef(onSessionEnded);
+  useLayoutEffect(() => { sessionEnded.current = onSessionEnded; }, [onSessionEnded]);
+  const [health, setHealth] = useState<MotokoHealth | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    let closed = false, busy = false;
+    let controller: AbortController | null = null;
+    const load = async () => {
+      if (closed || busy || document.visibilityState !== "visible") return;
+      busy = true; controller = new AbortController();
+      try {
+        const next = await fetchMotokoHealth(controller.signal);
+        if (!closed) { setHealth(next); setError(null); }
+      } catch (failure) {
+        if (closed) return;
+        if (failure instanceof ApiError && failure.status === 401) { sessionEnded.current(); return; }
+        setError(ownerErrorMessage(failure));
+      } finally { busy = false; if (!closed) setNow(Date.now()); }
+    };
+    const refresh = () => { setNow(Date.now()); void load(); };
+    void load();
+    const timer = window.setInterval(refresh, 5_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { closed = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); controller?.abort(); };
+  }, []);
+  if (health === null) return <p className={error ? "motoko-banner is-error" : "motoko-note"} role={error ? "alert" : "status"}>{error ?? t("Health sample pending.")}</p>;
+  const { ageMs, stale } = sampleAge(health, now);
+  return (
+    <div className="motoko-body">
+      <p className="motoko-banner">{t("VPS health: the server that hosts this app. Remote PCs and rigs are not included.")}</p>
+      {error && <p className="motoko-banner is-error" role="alert">{t("The last refresh failed: {error}", { error })}</p>}
+      {stale && <p className="motoko-banner is-stale" role="status">{t("This sample is stale: taken {age}. Values below may no longer hold.", { age: age(ageMs) })}</p>}
+      <p className="motoko-sample">{t("Sampled {age}", { age: age(ageMs) })}</p>
+      <dl className="motoko-facts">
+        <div><dt>{t("CPU utilization")}</dt><dd>{health.cpu.state === "known" ? t("{percent}% over {ms} ms", { percent: health.cpu.value.percent.toFixed(1), ms: Math.round(health.cpu.value.intervalMs) }) : t("Unknown")}</dd></div>
+        <div><dt>{t("Memory use (includes caches)")}</dt><dd>{health.memory.state === "known" ? t("{used} of {total} bytes", { used: health.memory.value.usedBytes.toLocaleString(currentLocale()), total: health.memory.value.totalBytes.toLocaleString(currentLocale()) }) : t("Unknown")}</dd></div>
+        <div><dt>{t("Server uptime")}</dt><dd>{health.uptime.state === "known" ? t("{seconds} seconds", { seconds: Math.floor(health.uptime.value).toLocaleString(currentLocale()) }) : t("Unknown")}</dd></div>
+      </dl>
+    </div>
   );
 }
 

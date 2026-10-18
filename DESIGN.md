@@ -2101,3 +2101,24 @@ Add a passkey focuses the existing form. A navigation action never starts a pass
 The terminal slots stay mounted and inert under Motoko. PC and pane selection close Motoko.
 The address keeps page=motoko. Back and Forward restore the page before any pane lookup.
 Health, the login cap, rig maps, and Hermes chat remain separate components.
+
+
+## Motoko VPS health and active logins
+
+VPS health opens through the existing Motoko tabs and owner-only command palette.
+The view follows the existing T3 Code sidebar and palette pattern above. It uses the existing facts layout and theme tokens.
+The view keeps the terminal slots intact. It adds no chart, process list, or separate navigation system.
+CPU, VPS, memory, uptime, and health search terms open the actual health view. All supported languages include these entries.
+
+The server samples aggregate OS counters only after an authenticated health request.
+CPU use comes from counter deltas over the actual monotonic interval. The first sample stays Unknown.
+Invalid counters, CPU count changes, or gaps above 30 seconds restart the CPU baseline.
+Memory use includes caches. Uptime describes the server that hosts this app. Each metric can fail independently.
+The view refreshes every five seconds while visible. Closure clears refresh work and aborts the request.
+The view rejects late responses after closure. A sample older than 15 seconds shows a stale notice.
+
+OwnerStore.issue checks the three-login limit before its synchronous state save.
+Only unexpired sessions for active credentials count. A fourth login returns owner_session_limit without a cookie or state change.
+The owner can still add a passkey at capacity. The owner must explicitly revoke an old login before another login succeeds.
+The Access view retains the current-login marker, device labels, and revocation confirmation.
+Existing session and device revocation checks still guard the final terminal effects.

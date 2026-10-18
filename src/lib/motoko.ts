@@ -10,7 +10,7 @@
  */
 import { startAuthentication, startRegistration, WebAuthnAbortService, type PublicKeyCredentialCreationOptionsJSON, type PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
 import type { AccessRefusal, HealthAuth } from "../../shared/protocol.ts";
-import type { MotokoRequestInput, MotokoRequests, MotokoRequestView, MotokoStatus, OwnerHealth, OwnerRefusal } from "../../shared/motoko.ts";
+import type { MotokoHealth, MotokoRequestInput, MotokoRequests, MotokoRequestView, MotokoStatus, OwnerHealth, OwnerRefusal } from "../../shared/motoko.ts";
 import { ApiError } from "./api.ts";
 import { t } from "./i18n.ts";
 
@@ -47,6 +47,7 @@ async function request<T>(url: string, method: "GET" | "POST" | "DELETE" = "GET"
   return (answer === "" ? undefined : JSON.parse(answer)) as T;
 }
 
+export const fetchMotokoHealth = (signal?: AbortSignal): Promise<MotokoHealth> => request("/api/motoko/health", "GET", undefined, signal);
 export const fetchMotokoStatus = (signal?: AbortSignal): Promise<MotokoStatus> => request("/api/motoko/status", "GET", undefined, signal);
 /** One request to the orchestrator: the caller keeps the requestId so a retry it chooses reuses it; nothing retries here. */
 export const submitMotokoRequest = (input: MotokoRequestInput): Promise<MotokoRequestView> => request("/api/motoko/requests", "POST", { requestId: input.requestId, text: input.text });
@@ -115,6 +116,7 @@ export function ownerErrorMessage(error: unknown): string {
       case "enrollment_required": return t("That enrollment token is wrong, used or expired. Create a new one over SSH.");
       case "enrollment_closed": return t("A passkey is already enrolled. Sign in with it instead.");
       case "too_many_attempts": return t("Too many wrong tries. Wait a moment, then try again.");
+      case "owner_session_limit": return t("Three active logins already exist. Revoke an old login from a device that is signed in.");
       case "last_credential": return t("You cannot revoke your last passkey here. Use the SSH recovery steps.");
       case "disabled_in_owner_mode": return t("Owner sign-in turns this off.");
       case "coordination_origin_unbound": return t("Requests are not connected on this server. Nothing was sent.");

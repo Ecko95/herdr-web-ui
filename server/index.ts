@@ -1,3 +1,4 @@
+import { createHealthSampler } from "./motoko-health.ts";
 import { createOpenRigProvider } from "./motoko-reader.ts";
 import { OwnerError, OwnerStore, ownerConfiguration, ownerRequestAllowed, disabledOwnerRoute, ownerError, type OwnerConfig } from "./motoko-owner.ts";
 import { CoordinationError, createCoordination, curlQueue, rigSourceCheck, sourceBinding, type Coordination } from "./motoko-coordination.ts";
@@ -340,6 +341,7 @@ export function createServer(
   if (testOrigin && (options.owner?.origin !== "http://localhost:0" || options.owner.rpId !== "localhost" || options.hostname !== "127.0.0.1" || options.port !== 0)) throw new Error("The test owner origin requires explicit loopback port zero");
   let notifyOwnerFault = () => {};
   const owner = ownerConfig ? new OwnerStore(ownerConfig, options.stateDir ?? defaultStateDir(), { onFault: () => notifyOwnerFault() }) : null;
+  const sampleHealth = createHealthSampler();
   const motokoEnv = { ...process.env };
   const motokoProvider = options.motokoProvider ?? createOpenRigProvider(undefined, Date.now, motokoEnv);
   // Owner requests to the orchestrator: enabled only by the exact registered source (HERDR_WEB_MOTOKO_SOURCE_SESSION)
@@ -1222,6 +1224,12 @@ export function createServer(
         return pathname === "/ws" ? new Response("unauthorized", { status: 401 }) : unauthorizedJson(access.level === "none" ? access.reason : "token_required");
       }
 
+      if (pathname === "/api/motoko/health") {
+        const { handleHealthRequest } = await import("./motoko-health.ts");
+        if (!owner || !ownerSession || !owner.current(ownerSession.id)) return owner ? owner.denied() : jsonResponse({ error: { code: "owner_gate_required", message: "Owner mode is required" } }, 404);
+        const sessionId = ownerSession.id;
+        return handleHealthRequest(request, { sample: sampleHealth, owner: { recheck: () => { owner.assertCurrent(sessionId); } } });
+      }
       if (pathname.startsWith("/api/motoko/")) {
         const { handleMotokoRequest } = await import("./motoko.ts");
         if (owner && (!ownerSession || !owner.current(ownerSession.id))) return owner.denied();

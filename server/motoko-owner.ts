@@ -165,7 +165,11 @@ export class OwnerStore {
     requireOwner(item, "unknown_credential", 401); return item;
   }
   private issue(credential: Credential, meta: Meta): { session: OwnerSession; cookie: string } {
-    const token = random(), now = this.now();
+    this.available();
+    const now = this.now();
+    const active = this.state.sessions.filter(s => s.idle_expires_at > now && s.absolute_expires_at > now && this.state.credentials.some(c => c.id === s.credential_id && c.status === "active")).length;
+    requireOwner(active < 3, "owner_session_limit", 409);
+    const token = random();
     const session: OwnerSession = { id: random(), token_hash: hash(token), credential_id: credential.id, created_at: now, last_active_at: now, idle_expires_at: now + IDLE, absolute_expires_at: now + ABSOLUTE, observed_ip: meta.ip, user_agent: meta.userAgent.slice(0, 160) };
     this.save({ ...this.state, credentials: this.state.credentials.map(c => c.id === credential.id ? credential : c), sessions: [...this.state.sessions, session] });
     return { session, cookie: `${OWNER_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${ABSOLUTE / 1000}${this.config.origin.startsWith("https:") ? "; Secure" : ""}` };
