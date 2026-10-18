@@ -85,6 +85,45 @@ describe("check", () => {
     run(dir, "commit", "-qam", "release");
   };
 
+  const removeTags = (dir: string) => run(dir, "tag", "-d", "v1.0.0", "remote-v1");
+
+  it("passes a same-version non-release with a readable base in a fork without tags", () => {
+    const dir = released({ "src/App.tsx": "fork change" });
+    removeTags(dir);
+    expect(check(dir, false, "HEAD^1")).toEqual({ version: null, problems: [] });
+  });
+
+  it("still requires release history without a readable same-version non-release base", () => {
+    const dir = released({ "src/App.tsx": "fork change" });
+    removeTags(dir);
+    for (const base of [undefined, "0000000000000000000000000000000000000000"]) {
+      expect(() => check(dir, false, base)).toThrow("No v* tags");
+    }
+    expect(() => check(dir, true, "HEAD^1")).toThrow("No v* tags");
+    releasePr(dir);
+    expect(() => check(dir, false, "HEAD^1")).toThrow("No v* tags");
+    expect(() => check(dir, true, "HEAD^1")).toThrow("No v* tags");
+  });
+
+  it("fetches an empty-tag origin and real tags but still fails a transport error", () => {
+    const origin = released({ "src/App.tsx": "fork change" });
+    removeTags(origin);
+    const clone = join(mkdtempSync(join(tmpdir(), "hwc-tag-fetch-")), "clone");
+    made.push(dirname(clone));
+    run(origin, "clone", "-q", "--no-local", origin, clone);
+    const workflow = readFileSync(join(import.meta.dir, "../.github/workflows/ci.yml"), "utf8");
+    const command = workflow.split("\n").find((line) => line.trim().startsWith("git fetch ") && line.includes("tags"))!.trim();
+    const fetch = () => spawnSync("bash", ["-e", "-c", command], { cwd: clone, encoding: "utf8" });
+    expect(fetch().status).toBe(0);
+    run(origin, "tag", "v1.0.0");
+    run(origin, "tag", "remote-v1");
+    expect(fetch().status).toBe(0);
+    const tags = spawnSync("git", ["-C", clone, "tag", "--list"], { encoding: "utf8" });
+    expect(tags.stdout.trim().split("\n")).toEqual(["remote-v1", "v1.0.0"]);
+    run(clone, "remote", "set-url", "origin", join(dirname(clone), "missing-origin"));
+    expect(fetch().status).not.toBe(0);
+  });
+
   it("leaves any tree whose version is already released alone, whatever it changed", () => {
     expect(check(released({ "server/index.ts": "b", "telemetry/worker.ts": "new" }), false)).toEqual({ version: null, problems: [] });
   });
