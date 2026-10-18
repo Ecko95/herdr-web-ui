@@ -72,9 +72,9 @@ describe("Motoko destinations", () => {
   it("offers only real owner destinations and routes each action", () => {
     const opened: string[] = [];
     const entries = motokoEntries(identity, (destination) => opened.push(destination));
-    expect(entries.map((entry) => entry.id)).toEqual(["motoko", "motoko-status", "motoko-health", "motoko-requests", "motoko-sessions", "motoko-passkey"]);
+    expect(entries.map((entry) => entry.id)).toEqual(["motoko", "motoko-status", "motoko-map", "motoko-health", "motoko-requests", "motoko-sessions", "motoko-passkey"]);
     for (const entry of entries) entry.run();
-    expect(opened).toEqual(["boot", "status", "health", "requests", "sessions", "passkey"]);
+    expect(opened).toEqual(["boot", "status", "map", "health", "requests", "sessions", "passkey"]);
     expect(motokoEntries(identity, null)).toEqual([]);
   });
 
@@ -85,6 +85,11 @@ describe("Motoko destinations", () => {
     for (const word of ["security", "devices", "sessions"]) expect(rankByTitle(word, rows)).toContain("motoko-sessions");
     expect(rankByTitle("credentials", rows)).toContain("motoko-passkey");
   });
+});
+
+it("finds the real map through topology search words",()=>{
+ const aliases=actionAliases(identity);const rows=motokoEntries(identity,()=>{}).map(e=>({item:e.id,title:e.label,aliases:aliases[e.id]}));
+ for(const word of ["map","topology","relationships","projects"])expect(rankByTitle(word,rows)).toContain("motoko-map");
 });
 
 it("CPU and VPS aliases open the real health destination", () => {

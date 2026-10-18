@@ -1,3 +1,5 @@
+import { mapScope, motokoMapScopeFromEnv, motokoTarget, type MotokoMapScope } from "./motoko-config.ts";
+import { createRigModelReader } from "./motoko-topology.ts";
 import { createHealthSampler } from "./motoko-health.ts";
 import { createOpenRigProvider } from "./motoko-reader.ts";
 import { OwnerError, OwnerStore, ownerConfiguration, ownerRequestAllowed, disabledOwnerRoute, ownerError, type OwnerConfig } from "./motoko-owner.ts";
@@ -263,6 +265,7 @@ export function createServer(
   options: {
     owner?: OwnerConfig;
     motokoProvider?: import("./motoko.ts").MotokoProvider;
+    motokoMapScope?: MotokoMapScope;
     /** Owner request coordination; tests pass one with a disposable queue. Unset, the environment binding decides. */
     coordination?: Coordination | null;
     port?: number;
@@ -343,6 +346,9 @@ export function createServer(
   const owner = ownerConfig ? new OwnerStore(ownerConfig, options.stateDir ?? defaultStateDir(), { onFault: () => notifyOwnerFault() }) : null;
   const sampleHealth = createHealthSampler();
   const motokoEnv = { ...process.env };
+  const mapCatalog = mapScope(options.motokoMapScope, motokoTarget(motokoEnv));
+  const mapReader = createRigModelReader(mapCatalog);
+  const mapRigKeys = new Set(mapCatalog?.rigs.map(r => r.key) ?? []);
   const motokoProvider = options.motokoProvider ?? createOpenRigProvider(undefined, Date.now, motokoEnv);
   // Owner requests to the orchestrator: enabled only by the exact registered source (HERDR_WEB_MOTOKO_SOURCE_SESSION)
   // and its startup check; tests pass their own instance. Without owner mode there is no coordination at all.
@@ -1160,7 +1166,8 @@ export function createServer(
         return pageMediaResponse(pathname.slice(PAGE_MEDIA_PATH.length), mediaClient, Date.now(), true)
           ?? jsonResponse({ error: { code: "not_found", message: "no such page media" } }, 404);
       }
-      let ownerSession = owner?.match(request, mutating) ?? null;
+      const ownerTouch = mutating && !pathname.startsWith("/api/motoko/map/");
+      let ownerSession = owner?.match(request, ownerTouch) ?? null;
       if (!owner && (pathname.startsWith("/api/owner/") || pathname.startsWith("/api/motoko/"))) return jsonResponse({ error: { code: "owner_gate_required", message: "Owner mode is required" } }, 404);
       if (owner && (pathname.startsWith("/api/") || pathname === "/ws")) {
         if ((mutating || pathname === "/ws") && !ownerRequestAllowed(request, owner.config)) return jsonResponse({ error: { code: "invalid_origin", message: "Use owner controls from this origin" } }, 403);
@@ -1169,13 +1176,13 @@ export function createServer(
         const handled = await owner.handle(request, url, { ip: bunServer.requestIP(request)?.address ?? "unknown", userAgent: request.headers.get("user-agent") ?? "", client: authClient(bunServer.requestIP(request)?.address ?? null, request.headers) });
         if (handled) return handled;
         if (pathname === "/api/auth" && request.method === "DELETE") { try { return handleAuthRequest(request, token, null, () => owner.signOut(request)); } catch (error) { return ownerError(error); } }
-        ownerSession = owner.match(request, mutating);
+        ownerSession = owner.match(request, ownerTouch);
         if (!ownerSession) return owner.denied();
       }
       const checkOwner = (): void => {
         if (owner && ownerSession) owner.assertCurrent(ownerSession.id);
       };
-      if (owner && ownerSession && mutating && request.headers.get("content-type")?.includes("application/json")) {
+      if (owner && ownerSession && mutating && !pathname.startsWith("/api/motoko/map/") && request.headers.get("content-type")?.includes("application/json")) {
         const body = await request.arrayBuffer();
         if (!owner.current(ownerSession.id)) return owner.denied();
         request = new Request(request, { body });
@@ -1224,6 +1231,14 @@ export function createServer(
         return pathname === "/ws" ? new Response("unauthorized", { status: 401 }) : unauthorizedJson(access.level === "none" ? access.reason : "token_required");
       }
 
+      if (pathname.startsWith("/api/motoko/map/")) {
+        const { handleRigMapRequest } = await import("./motoko-topology.ts");
+        if (!owner || !ownerSession || !owner.current(ownerSession.id)) return owner?.denied() ?? new Response(null, { status: 404 });
+        const session = ownerSession;
+        const context = { ownerSessionId: session.id, allowedRigKeys: mapRigKeys,
+          signal: AbortSignal.any([request.signal, owner.signal(session.id)]), recheck: () => { owner.assertCurrent(session.id); } };
+        return handleRigMapRequest(request, mapReader, context);
+      }
       if (pathname === "/api/motoko/health") {
         const { handleHealthRequest } = await import("./motoko-health.ts");
         if (!owner || !ownerSession || !owner.current(ownerSession.id)) return owner ? owner.denied() : jsonResponse({ error: { code: "owner_gate_required", message: "Owner mode is required" } }, 404);
@@ -2346,13 +2361,14 @@ export function createServer(
 
 if (import.meta.main) {
   try { ownerConfiguration(); } catch { console.error("Invalid owner configuration"); process.exit(1); }
+  const motokoMapScope = motokoMapScopeFromEnv(process.env);
   const updates = connectUpdater();
   const version = (JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")) as { version: string }).version;
   const telemetry = new Telemetry({ stateDir: defaultStateDir(), version, env: process.env, fetch, previousVersion: () => updates.installed().previous_version });
   const portal = new PortalService({ stateDir: defaultStateDir() });
   let instance: ReturnType<typeof createServer>;
   try {
-    instance = createServer({ updates, herdrUpdate: new HerdrUpdater(), portal, telemetry, registerBridge: true, herdrProfiles: readHerdrProfiles });
+    instance = createServer({ motokoMapScope, updates, herdrUpdate: new HerdrUpdater(), portal, telemetry, registerBridge: true, herdrProfiles: readHerdrProfiles });
   } catch (err) {
     const { code, syscall } = err as { code?: string; syscall?: string };
     // only the bind itself: a permission error reading a state file keeps its own message and path

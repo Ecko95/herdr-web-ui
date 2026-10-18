@@ -57,3 +57,9 @@ it("focuses the passkey form on every request without a ceremony", async () => {
   expect(requests.every((request) => request.method === "GET")).toBe(true);
   expect(requests.every((request) => request.url === "/api/owner/sessions")).toBe(true);
 });
+
+it("opens the map destination through the owner page",async()=>{
+ await open({destination:"map"});
+ expect(requests).toContainEqual({url:"/api/motoko/map/rigs",method:"GET"});
+ expect(JSON.stringify(renderer!.toJSON())).toContain("Map");
+});

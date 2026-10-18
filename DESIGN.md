@@ -2122,3 +2122,15 @@ Only unexpired sessions for active credentials count. A fourth login returns own
 The owner can still add a passkey at capacity. The owner must explicitly revoke an old login before another login succeeds.
 The Access view retains the current-login marker, device labels, and revocation confirmation.
 Existing session and device revocation checks still guard the final terminal effects.
+
+
+### Rig map
+
+The owner-only Map tab uses the existing Motoko surfaces, type, focus styles, and theme tokens.
+Native seat buttons sit above a directed SVG link layer. The text list preserves every reported link.
+The phone view uses the same seat buttons as a list below 640 pixels.
+Saved rig, zoom, mode, and pod choices stay on the device. They change presentation only.
+The server reads only the configured rig catalog through fixed loopback routes.
+The map labels retrieval time, stale context, declared export values, and unknown effective runtime configuration separately.
+Draft controls validate typed changes. They do not apply a change or restart an agent.
+Operational controls and the real Hermes adapter remain separate obligations.

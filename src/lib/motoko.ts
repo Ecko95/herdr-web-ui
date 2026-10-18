@@ -1,3 +1,4 @@
+import type { RigCatalog, RigMapModel, RigDraftRequest, RigDraftResult } from "../../shared/motoko-topology.ts";
 /**
  * The browser's side of Motoko: the status read and the owner's passkey ceremonies against
  * /api/owner/* (server/motoko-owner.ts). The ceremonies are the browser's own WebAuthn prompts,
@@ -32,7 +33,7 @@ export function ownerMode(auth: OwnerAuth | null): boolean {
 async function request<T>(url: string, method: "GET" | "POST" | "DELETE" = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, method === "GET"
     ? { cache: "no-store", signal }
-    : { method, headers: { "content-type": "application/json", "x-herdr-machine": "1" }, body: JSON.stringify(body ?? {}) });
+    : { method, signal, headers: { "content-type": "application/json", "x-herdr-machine": "1" }, body: JSON.stringify(body ?? {}) });
   if (!response.ok) {
     let detail = response.statusText;
     let code: string | null = null;
@@ -136,3 +137,7 @@ export function ownerErrorMessage(error: unknown): string {
   }
   return String(error);
 }
+
+export const fetchRigCatalog = (signal?:AbortSignal):Promise<RigCatalog> => request("/api/motoko/map/rigs","GET",undefined,signal);
+export const fetchRigModel = (key:string,signal?:AbortSignal):Promise<RigMapModel> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}`,"GET",undefined,signal);
+export const validateRigDraft = (key:string,input:RigDraftRequest,signal?:AbortSignal):Promise<RigDraftResult> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}/validate`,"POST",input,signal);

@@ -680,7 +680,7 @@ input regression matrix.
 
 ## Motoko private configuration
 
-Motoko reads one fixed rig from private startup configuration. The plugin reads its existing `env` or `.env` file in its configuration directory.
+Motoko reads its status and request target from private startup configuration. The plugin reads its existing `env` or `.env` file in its configuration directory.
 Set these three values in that private file before server startup. The following values are fictional examples.
 
 ```dotenv
@@ -699,6 +699,31 @@ The server never uses fixture data as a fallback. A configuration change require
 Saved receipts retain their original rig ID, source, and destination. A scope mismatch refuses all queue access and leaves stored bytes unchanged.
 Older receipts without a rig ID also refuse queue access. This change does not migrate or replace those receipts.
 Keep actual deployment values out of source files, browser configuration, and public diagnostics.
+
+### Map catalog at startup
+
+The optional `HERDR_WEB_MOTOKO_MAP_SCOPE` variable contains a JSON catalog for the owner map.
+JSON is a text format for structured data. Set this variable in the same private startup environment.
+The server accepts at most 65,536 UTF-8 bytes before it parses JSON. UTF-8 encodes text as bytes.
+The server uses the existing `mapScope` validator. Explicit invalid input stops startup with `invalid_map_scope`.
+Empty input, invalid JSON, duplicate identities, and unknown mapping keys also stop startup.
+An absent variable retains the existing one-rig fallback from the three target values above.
+This catalog does not change the status target, request target, owner configuration, or state paths.
+
+This single-line example uses fictional rigs:
+
+```dotenv
+HERDR_WEB_MOTOKO_MAP_SCOPE='{"rigs":[{"key":"alpha","rigId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","rigName":"fiction-alpha","label":"Alpha","ownerProfileKey":null,"projectKey":null},{"key":"beta","rigId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","rigName":"fiction-beta","label":"Beta","ownerProfileKey":null,"projectKey":null}],"ownerProfiles":[],"projects":[]}'
+```
+
+- The catalog contains 1 to 32 rigs. Each rig has a unique key, ID, and name.
+- Each mapping list contains at most 32 entries with unique keys and display labels.
+- A non-null `ownerProfileKey` or `projectKey` must match a key in its mapping list.
+
+Keep unknown profile and project assignments as `null`. The server does not infer assignments from rig names.
+The catalog permits reads through the fixed local OpenRig connection. It does not discover hosts or accept URLs or file paths.
+Only the owner can read the map. A configuration change requires a server restart.
+Keep actual rig identities and mappings in private deployment configuration.
 
 ## Fork upstream updates
 

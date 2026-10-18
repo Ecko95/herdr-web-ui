@@ -7,7 +7,7 @@
 import type { SplitPaneDirection } from "../../shared/protocol.ts";
 import type { ZoomMode } from "./layoutMap.ts";
 
-export type MotokoDestination = "boot" | "status" | "health" | "requests" | "sessions" | "passkey";
+export type MotokoDestination = "boot" | "status" | "map" | "health" | "requests" | "sessions" | "passkey";
 export interface MotokoRequest { destination: MotokoDestination }
 
 export type PaneView = "chat" | "terminal";
