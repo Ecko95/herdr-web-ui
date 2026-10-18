@@ -135,6 +135,7 @@ describe("demo transport", () => {
     "/api/pane/image": "pasting an image: the demo stores no files (listed when this guard was added)",
     "/api/pane/read": "the scrollback read behind a chat with no transcript: the demo answers /api/pane/conversation instead (listed when this guard was added)",
     "/api/pane/selection": "copying a selection across screens: not part of the demo (listed when this guard was added)",
+    "/api/motoko/health": "owner mode only: ownerMode rejects the demo auth, so Motoko never mounts HealthView (src/components/Motoko.tsx)",
     "/api/motoko/requests": "owner mode only: Motoko's Requests view runs only behind the owner gate (src/components/Motoko.tsx), which the demo never reports",
     "/api/owner/bootstrap/options": "owner mode only: the browser calls it only behind the owner gate (src/lib/motoko.ts), which the demo never reports",
     "/api/owner/credentials/add/authorize": "owner mode only: the browser calls it only behind the owner gate (src/lib/motoko.ts), which the demo never reports",
