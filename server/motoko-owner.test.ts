@@ -20,7 +20,8 @@ test("controlled child roots exclude inherited accounts, selectors, and live soc
   expect(tmpdir()).toBe(join(controlledRoot, "tmp"));
   expect(process.env["HERDR_WEB_STATE_DIR"]).toBe(join(controlledRoot, "herdr-state"));
   expect(defaultStateDir()).toBe(process.env["HERDR_WEB_STATE_DIR"]!);
-  expect(process.env["HERDR_SOCKET"]).toBe(join(controlledRoot, "config/herdr/sessions/herdr-web-ui-test/herdr.sock"));
+  expect(env["HERDR_SOCKET"]).toBe(join(root, "config/herdr/sessions/herdr-web-ui-test/herdr.sock"));
+  expect(process.env["HERDR_SOCKET"]).toBe(join(tmpdir(), "herdr-web-ui-unit-tests-have-no-herdr.sock"));
 });
 
 test("controlled runner refuses live-test override without a child", async () => {

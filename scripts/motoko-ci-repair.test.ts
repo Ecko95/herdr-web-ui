@@ -225,10 +225,17 @@ function ownerRootAssertion(platform: "posix" | "win32", overrides: Record<strin
     Bun: { which: (name: string) => name === "bun" ? bin : null },
     process: { platform, env: {} }, mkdirSync() {}, existsSync: () => false, ...paths,
   }, "controlledEnvironment");
-  const env = { ...environment(root), ...overrides };
+  const env = environment(root);
+  const homedir = () => env.HOME, tmpdir = () => env.TMPDIR;
+  const unitBranch = between(source("scripts/test-herdr.ts"), '  if (process.env["HERDR_TEST_MODE"] === "unit") {', '  if (process.env["HERDR_TEST_LIVE"] === "1") return null;');
+  const unitPreload = compile(`function runUnitPreload() { ${unitBranch} throw new Error("Unit preload did not return"); }`, {
+    process: { env }, tmpdir, ...paths,
+  }, "runUnitPreload");
+  expect(unitPreload()).toBeNull();
+  expect(env.HERDR_SOCKET).toBe(paths.join(env.TMPDIR, "herdr-web-ui-unit-tests-have-no-herdr.sock"));
+  Object.assign(env, overrides);
   const start = 'test("controlled child roots exclude inherited accounts, selectors, and live sockets", () => {';
   const body = between(source("server/motoko-owner.test.ts"), start, "\n});").slice(start.length);
-  const homedir = () => env.HOME, tmpdir = () => env.TMPDIR;
   const defaultStateDir = compile(between(source("server/update-state.ts"), "export function defaultStateDir", "/** One update state"), {
     process: { env }, homedir, ...paths,
   }, "defaultStateDir");
@@ -239,10 +246,10 @@ function ownerRootAssertion(platform: "posix" | "win32", overrides: Record<strin
 }
 
 for (const platform of ["posix", "win32"] as const) {
-  test(`the exact owner assertion accepts the controlled sibling roots on ${platform}`, () => {
+  test(`the exact owner assertion accepts the actual unit preload socket on ${platform}`, () => {
     expect(ownerRootAssertion(platform)).not.toThrow();
   });
-  test(`the exact owner assertion rejects a socket beneath TMPDIR on ${platform}`, () => {
+  test(`the exact owner assertion rejects a different socket beneath TMPDIR on ${platform}`, () => {
     const paths = platform === "win32" ? win32 : posix;
     const root = platform === "win32" ? "C:\\fiction\\motoko-proof-parent" : "/fiction/motoko-proof-parent";
     expect(ownerRootAssertion(platform, { HERDR_SOCKET: paths.join(root, "tmp", "wrong.sock") })).toThrow();
