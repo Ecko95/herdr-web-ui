@@ -10,7 +10,10 @@
  * ever share a herdr, and none shares the plain `<session>` with the browser scripts.
  * HERDR_TEST_SHARDS sets the worker count; 1 is the old serial run.
  */
-import { availableParallelism } from "node:os";
+import { mkdtempSync, rmSync } from "node:fs";
+import { availableParallelism, tmpdir } from "node:os";
+import { join } from "node:path";
+import { controlledEnvironment } from "./motoko-env.ts";
 
 const suite = process.argv[2];
 if (suite !== "unit" && suite !== "integration") throw new Error("Usage: bun scripts/ci-tests.ts unit|integration");
@@ -35,14 +38,22 @@ if (suite === "unit") {
   const workers = requestedWorkers >= 1 ? Math.floor(requestedWorkers) : defaultWorkers;
   // Each parallel worker merges a file's stdout and stderr through `sh`; without one (native
   // Windows), the files run serially in one bun process instead.
-  const effectiveWorkers = Bun.which("sh") ? Math.min(workers, selected.length) : 1;
+  const shell = Bun.which("sh");
+  const effectiveWorkers = shell ? Math.min(workers, selected.length) : 1;
 
   if (effectiveWorkers <= 1) {
-    const child = Bun.spawn([process.execPath, "test", ...selected.map((file) => `./${file}`)], {
-      env: { ...process.env, HERDR_TEST_MODE: suite },
-      windowsHide: true, stdin: "inherit", stdout: "inherit", stderr: "inherit",
-    });
-    process.exit(await child.exited);
+    const root = mkdtempSync(join(tmpdir(), "motoko-proof-"));
+    let code: number;
+    try {
+      const child = Bun.spawn([process.execPath, "test", ...selected.map((file) => `./${file}`)], {
+        env: { ...controlledEnvironment(root), HERDR_TEST_MODE: suite },
+        windowsHide: true, stdin: "inherit", stdout: "inherit", stderr: "inherit",
+      });
+      code = await child.exited;
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+    process.exit(code);
   }
 
   console.log(`Running with ${effectiveWorkers} parallel workers`);
@@ -55,17 +66,22 @@ if (suite === "unit") {
   async function unitWork(workerId: number): Promise<void> {
     for (let file = queue.shift(); file; file = queue.shift()) {
       const fileStartedAt = Date.now();
-      const child = Bun.spawn(["sh", "-c", 'exec "$@" 2>&1', "sh", process.execPath, "test", "--timeout", "60000", `./${file}`], {
-        env: { ...process.env, HERDR_TEST_MODE: suite! },
-        stdin: "ignore", stdout: "pipe", stderr: "inherit",
-      });
-      const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
-      const plain = output.replace(/\x1b\[[0-9;]*m/g, "");
-      const count = (word: keyof typeof totals) => Number(new RegExp(`^\\s*(\\d+) ${word}$`, "m").exec(plain)?.[1] ?? 0);
-      for (const word of ["pass", "fail", "skip"] as const) totals[word] += count(word);
-      if (!/^\s*\d+ pass$/m.test(plain) && !/^\s*\d+ fail$/m.test(plain)) unread.push(file);
-      if (code !== 0) failed.push(file);
-      console.log(`\n--- ${file} (worker-${workerId}, ${((Date.now() - fileStartedAt) / 1000).toFixed(1)}s, exit ${code})\n${output.trimEnd()}`);
+      const root = mkdtempSync(join(tmpdir(), "motoko-proof-"));
+      try {
+        const child = Bun.spawn([shell!, "-c", 'exec "$@" 2>&1', "sh", process.execPath, "test", "--timeout", "60000", `./${file}`], {
+          env: { ...controlledEnvironment(root), HERDR_TEST_MODE: suite! },
+          stdin: "ignore", stdout: "pipe", stderr: "inherit",
+        });
+        const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+        const plain = output.replace(/\x1b\[[0-9;]*m/g, "");
+        const count = (word: keyof typeof totals) => Number(new RegExp(`^\\s*(\\d+) ${word}$`, "m").exec(plain)?.[1] ?? 0);
+        for (const word of ["pass", "fail", "skip"] as const) totals[word] += count(word);
+        if (!/^\s*\d+ pass$/m.test(plain) && !/^\s*\d+ fail$/m.test(plain)) unread.push(file);
+        if (code !== 0) failed.push(file);
+        console.log(`\n--- ${file} (worker-${workerId}, ${((Date.now() - fileStartedAt) / 1000).toFixed(1)}s, exit ${code})\n${output.trimEnd()}`);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     }
   }
 

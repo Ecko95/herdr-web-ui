@@ -1415,6 +1415,7 @@ export const ZH: Record<string, string> = {
   "Passkeys": "通行密钥列表",
   "{percent}% · {used} of {window}": "{percent}% · {window} 中的 {used}",
   "Personal": "个人",
+  "Revoke": "撤销",
   "Revoked.": "已撤销。",
   "Revoke passkey {name}": "撤销通行密钥 {name}",
   "Revoke session from {name}": "撤销来自 {name} 的会话",

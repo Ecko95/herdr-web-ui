@@ -1411,6 +1411,7 @@ export const KO: Record<string, string> = {
   "Passkeys": "패스키",
   "{percent}% · {used} of {window}": "{percent}% · {window} 중 {used}",
   "Personal": "개인",
+  "Revoke": "취소",
   "Revoked.": "취소했습니다.",
   "Revoke passkey {name}": "패스키 {name} 취소",
   "Revoke session from {name}": "{name}의 세션 취소",

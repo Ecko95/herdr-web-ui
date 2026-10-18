@@ -1413,6 +1413,7 @@ export const JA: Record<string, string> = {
   "Passkeys": "パスキー一覧",
   "{percent}% · {used} of {window}": "{percent}% · {window} 中 {used}",
   "Personal": "個人",
+  "Revoke": "取り消す",
   "Revoked.": "取り消しました。",
   "Revoke passkey {name}": "パスキー {name} を取り消す",
   "Revoke session from {name}": "{name} のセッションを取り消す",

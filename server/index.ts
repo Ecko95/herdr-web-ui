@@ -421,7 +421,7 @@ export function createServer(
 
   const submitText = createSubmitText({ options, lastTyped, attachments, terminalAttach, SUBMIT_DEADLINE_MS, TYPED_SETTLE_MS, DRAFT_CLEAR_WAIT_MS, DRAFT_CLEAR_POLL_MS, SUBMIT_DELAY_MS });
 
-  const { mayType, authorizeSocket, admit, setRole, watchPane, unwatchPane, killWatches, end } = createConnections({ clients, present, pending, devices, detachClaimed, dropClaims, owner });
+  const { mayType, mayEraseSecret, authorizeSocket, admit, setRole, watchPane, unwatchPane, killWatches, end } = createConnections({ clients, present, pending, devices, detachClaimed, dropClaims, owner });
 
   function pendingLease(owner: Client, paneId: string): PendingLease {
     const attachment = attachments.get(paneId);
@@ -2059,9 +2059,9 @@ export function createServer(
                       await paneSendKeys(message.pane_id, ["Enter"], undefined, allowed);
                     } catch (error) {
                       if (!(error instanceof HerdrError && error.code === "cancelled")) throw error;
-                      // Cleanup requires current authority, like the original secret write.
+                      // Erase accepted bytes after a role switch, but never after device or owner revocation.
                       // Raw-mode readers may receive these bytes without erasing their own buffer.
-                      await paneSendKeys(message.pane_id, Array(message.secret.length).fill("Backspace"), undefined, () => mayType(client));
+                      await paneSendKeys(message.pane_id, Array(message.secret.length).fill("Backspace"), undefined, () => mayEraseSecret(client));
                       result(false, connectionOf(client).closing || connectionOf(client).roles !== roles
                         ? "read_only" : "not_attached");
                       return;

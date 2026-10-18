@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
 import { controlledEnvironment, runControlled, syntheticNetworkCalls, syntheticServerOptions } from "../scripts/motoko-env.ts";
 import { defaultStateDir } from "./update-state.ts";
 import { createServer } from "./index.ts";
@@ -12,11 +12,15 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 
 test("controlled child roots exclude inherited accounts, selectors, and live sockets", () => {
   const root = temporary(), env = controlledEnvironment(root);
-  for (const name of ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "TMPDIR", "HERDR_WEB_STATE_DIR", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "HERMES_HOME", "GROK_HOME", "OPENCODE_DB", "HERDR_SOCKET"]) expect(env[name]?.startsWith(root + "/")).toBe(true);
+  for (const name of ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "TMPDIR", "HERDR_WEB_STATE_DIR", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "HERMES_HOME", "GROK_HOME", "OPENCODE_DB", "HERDR_SOCKET"]) expect(env[name]?.startsWith(join(root, sep))).toBe(true);
   for (const name of ["HERDR_TEST_LIVE", "HERDR_WEB_TOKEN", "SSH_AUTH_SOCK", "PORT", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "HERDR_WEB_TAILSCALE_OWNER"]) expect(env[name]).toBeUndefined();
-  expect(homedir().startsWith(tmpdir().replace(/\/tmp$/, "") )).toBe(true);
+  const controlledRoot = dirname(homedir());
+  expect(basename(controlledRoot).startsWith("motoko-proof-")).toBe(true);
+  expect(homedir()).toBe(join(controlledRoot, "home"));
+  expect(tmpdir()).toBe(join(controlledRoot, "tmp"));
+  expect(process.env["HERDR_WEB_STATE_DIR"]).toBe(join(controlledRoot, "herdr-state"));
   expect(defaultStateDir()).toBe(process.env["HERDR_WEB_STATE_DIR"]!);
-  expect(process.env["HERDR_SOCKET"]?.startsWith(tmpdir())).toBe(true);
+  expect(process.env["HERDR_SOCKET"]).toBe(join(controlledRoot, "config/herdr/sessions/herdr-web-ui-test/herdr.sock"));
 });
 
 test("controlled runner refuses live-test override without a child", async () => {

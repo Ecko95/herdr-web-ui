@@ -105,10 +105,15 @@ export function createConnections<Lease>({ clients, present, pending, devices, d
   detachClaimed: (client: Client) => void;
   dropClaims: (client: Client) => void;
 }) {
+  /** Only the Backspace cleanup of an accepted secret may outlive a temporary observe role. */
+  function mayEraseSecret(client: Client): boolean {
+    const state = stateOf(client);
+    return clients.has(client) && !state.closing && !state.revoked && (!owner || !!client.data.ownerSessionId && !!owner.current(client.data.ownerSessionId)) && !client.data.readOnly;
+  }
+
   /** authorizeSocket as a test: may this connection type now? */
   function mayType(client: Client): boolean {
-    const state = stateOf(client);
-    return clients.has(client) && !state.closing && !state.revoked && (!owner || !!client.data.ownerSessionId && !!owner.current(client.data.ownerSessionId)) && !client.data.readOnly && state.mode !== "observe";
+    return mayEraseSecret(client) && stateOf(client).mode !== "observe";
   }
 
   function authorizeSocket(client: Client): void {
@@ -219,5 +224,5 @@ export function createConnections<Lease>({ clients, present, pending, devices, d
     }
   }
 
-  return { mayType, authorizeSocket, admit, setRole, watchPane, unwatchPane, killWatches, end };
+  return { mayType, mayEraseSecret, authorizeSocket, admit, setRole, watchPane, unwatchPane, killWatches, end };
 }
