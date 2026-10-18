@@ -1504,4 +1504,11 @@ export const KO: Record<string, string> = {
   "The server did not confirm this request. It can already exist. Retry it or discard it.": "서버가 이 요청을 확인하지 않았습니다. 이미 있을 수 있습니다. 다시 시도하거나 버리세요.",
   "This request ID was already used with different text. Nothing was sent.": "이 요청 ID는 이미 다른 텍스트로 사용되었습니다. 아무것도 보내지 않았습니다.",
   "Write 1 to 4096 bytes of text. Nothing was sent.": "1~4096바이트의 텍스트를 쓰세요. 아무것도 보내지 않았습니다.",
+  "Motoko requests": "Motoko 요청",
+  "Active logins": "활성 로그인",
+  "owner workspace rigs seats": "소유자 작업 공간 리그 좌석",
+  "motoko rig seat status activity context": "motoko 리그 좌석 상태 활동 컨텍스트",
+  "motoko requests queue results": "motoko 요청 큐 결과",
+  "security devices sessions active logins": "보안 기기 세션 활성 로그인",
+  "security credentials passkeys add key": "보안 자격 증명 패스키 키 추가",
 };

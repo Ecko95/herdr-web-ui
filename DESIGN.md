@@ -2087,3 +2087,17 @@ The values are the ones in `src/styles.css`.
 | Terminal content accessibility relies on xterm defaults | `PaneTerminal.tsx` | Screen-reader mode changes terminal DOM and input behavior | Decide with herdr TUI owners |
 | Drawer has no focus trap | `.sidebar.is-open` | Closed state leaves the tab order, but open-state trapping is not implemented | Add a shared focus utility |
 | Modal focus is initialized, not fully trapped | Dialog components | Escape/scrim/close work; tab containment is not shared | Add the same focus utility |
+
+
+## Motoko workspace navigation
+
+Motoko uses the existing sidebar style and command palette. The entry sits above all PC groups.
+The entry follows T3 Code's shared sidebar and palette access to an application page.
+[T3 Code usage guide](https://github.com/pingdotgg/t3code/blob/main/docs/user/usage.md) documents that pattern.
+The owner chooses this placement. No third-party code or pixels form this implementation.
+
+The shared action exists only for an authenticated owner. Active logins opens the existing sessions list.
+Add a passkey focuses the existing form. A navigation action never starts a passkey ceremony.
+The terminal slots stay mounted and inert under Motoko. PC and pane selection close Motoko.
+The address keeps page=motoko. Back and Forward restore the page before any pane lookup.
+Health, the login cap, rig maps, and Hermes chat remain separate components.

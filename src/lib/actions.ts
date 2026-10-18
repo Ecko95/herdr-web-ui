@@ -7,6 +7,9 @@
 import type { SplitPaneDirection } from "../../shared/protocol.ts";
 import type { ZoomMode } from "./layoutMap.ts";
 
+export type MotokoDestination = "boot" | "status" | "requests" | "sessions" | "passkey";
+export interface MotokoRequest { destination: MotokoDestination }
+
 export type PaneView = "chat" | "terminal";
 
 /** The selected pane’s mounted input and history, bound to its PC. */
@@ -16,6 +19,8 @@ export interface PaneControls {
 }
 
 export interface AppActions {
+  /** Null outside an authenticated owner session. Navigation never starts a passkey ceremony. */
+  openMotoko: ((destination: MotokoDestination) => void) | null;
   selectPane: (paneId: string) => void;
   /** the previous/next pane in sidebar order; wraps around */
   selectAdjacentPane: (direction: -1 | 1) => void;

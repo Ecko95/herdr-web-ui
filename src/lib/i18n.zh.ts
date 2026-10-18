@@ -1508,4 +1508,11 @@ export const ZH: Record<string, string> = {
   "The server did not confirm this request. It can already exist. Retry it or discard it.": "服务器未确认此请求。它可能已经存在。请重试或放弃。",
   "This request ID was already used with different text. Nothing was sent.": "此请求 ID 已用于不同的文本。未发送任何内容。",
   "Write 1 to 4096 bytes of text. Nothing was sent.": "请写 1 到 4096 字节的文本。未发送任何内容。",
+  "Motoko requests": "Motoko 请求",
+  "Active logins": "有效登录",
+  "owner workspace rigs seats": "所有者 工作区 团队 席位",
+  "motoko rig seat status activity context": "motoko 团队 席位 状态 活动 上下文",
+  "motoko requests queue results": "motoko 请求 队列 结果",
+  "security devices sessions active logins": "安全 设备 会话 有效登录",
+  "security credentials passkeys add key": "安全 凭据 通行密钥 添加 密钥",
 };

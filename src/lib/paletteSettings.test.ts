@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 
 import { translate } from "./i18n.ts";
-import { actionAliases, rankByTitle, requestedSettingsPage, requestSettingsPage, settingsPageEntries } from "./paletteSettings.ts";
+import { actionAliases, motokoEntries, rankByTitle, requestedSettingsPage, requestSettingsPage, settingsPageEntries } from "./paletteSettings.ts";
 import type { Translate } from "./i18n.ts";
 
 const identity = (key: string): string => key;
@@ -64,5 +64,25 @@ describe("requested page", () => {
     expect(requestedSettingsPage()).toBe("terminal");
     requestSettingsPage(null);
     expect(requestedSettingsPage()).toBeNull();
+  });
+});
+
+
+describe("Motoko destinations", () => {
+  it("offers only real owner destinations and routes each action", () => {
+    const opened: string[] = [];
+    const entries = motokoEntries(identity, (destination) => opened.push(destination));
+    expect(entries.map((entry) => entry.id)).toEqual(["motoko", "motoko-status", "motoko-requests", "motoko-sessions", "motoko-passkey"]);
+    for (const entry of entries) entry.run();
+    expect(opened).toEqual(["boot", "status", "requests", "sessions", "passkey"]);
+    expect(motokoEntries(identity, null)).toEqual([]);
+  });
+
+  it("finds active logins and passkeys through security aliases", () => {
+    const entries = motokoEntries(identity, () => {});
+    const aliases = actionAliases(identity);
+    const rows = entries.map((entry) => ({ item: entry.id, title: entry.label, aliases: aliases[entry.id] }));
+    for (const word of ["security", "devices", "sessions"]) expect(rankByTitle(word, rows)).toContain("motoko-sessions");
+    expect(rankByTitle("credentials", rows)).toContain("motoko-passkey");
   });
 });

@@ -1506,4 +1506,11 @@ export const JA: Record<string, string> = {
   "The server did not confirm this request. It can already exist. Retry it or discard it.": "サーバーはこのリクエストを確認しませんでした。すでに存在する可能性があります。再試行するか破棄してください。",
   "This request ID was already used with different text. Nothing was sent.": "このリクエスト ID は別のテキストですでに使われています。何も送信していません。",
   "Write 1 to 4096 bytes of text. Nothing was sent.": "1〜4096 バイトのテキストを書いてください。何も送信していません。",
+  "Motoko requests": "Motoko へのリクエスト",
+  "Active logins": "有効なログイン",
+  "owner workspace rigs seats": "所有者 ワークスペース リグ シート",
+  "motoko rig seat status activity context": "motoko リグ シート 状態 アクティビティ コンテキスト",
+  "motoko requests queue results": "motoko リクエスト キュー 結果",
+  "security devices sessions active logins": "セキュリティ デバイス セッション 有効なログイン",
+  "security credentials passkeys add key": "セキュリティ 認証情報 パスキー キー 追加",
 };

@@ -55,6 +55,24 @@
   line-height: var(--lh-tight);
 }
 
+button.machine-title {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.machine-title:hover { background: var(--bg-hover); }
+
+button.motoko-workspace {
+  width: calc(100% - var(--side-gutter) * 2);
+  margin: 0 var(--side-gutter) var(--space-4);
+  border-radius: var(--radius-sm);
+}
+
+button.motoko-workspace.is-selected { background: var(--accent-tint); color: var(--accent); }
+
 .machine-name {
   min-width: 0;
   overflow: hidden;
