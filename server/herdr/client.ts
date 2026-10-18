@@ -279,8 +279,9 @@ export async function pluginActionInvoke(
   actionId: string,
   context?: PluginInvocationContext,
   socketPath?: string,
+  guard?: () => boolean,
 ): Promise<{ log: PluginCommandLog }> {
-  return herdrRpc("plugin.action.invoke", { plugin_id: pluginId, action_id: actionId, ...(context === undefined ? {} : { context }) }, socketPath);
+  return herdrRpc("plugin.action.invoke", { plugin_id: pluginId, action_id: actionId, ...(context === undefined ? {} : { context }) }, socketPath, undefined, guard);
 }
 
 export async function pluginLogList(pluginId: string, limit: number, socketPath?: string, timeoutMs?: number): Promise<PluginCommandLog[]> {

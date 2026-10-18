@@ -31,7 +31,7 @@ import { omoRuns, omoTasks } from "./omo-tasks.ts";
 import { claudeSubagents, within } from "./claude-subagents.ts";
 import { SHELL_AGENTS, shellAgentExecutable } from "./shell-agent.ts";
 import { claudeForegroundSession, claudeSessionTempDir } from "./claude-store.ts";
-import { fileResponse, findFile, crossSiteFileRead, forgetPageMedia, pageMediaResponse, pageMediaSource, PAGE_MEDIA_PATH } from "./file-view.ts";
+import { fileResponse, findFile, crossSiteFileRead, forgetPageMedia, pageMediaResponse, pageMediaSource, PAGE_MEDIA_PATH, PAGE_MEDIA_ROUTE } from "./file-view.ts";
 import { findProjectFavicon } from "./project-favicon.ts";
 import {
   agentManifests,
@@ -1151,6 +1151,13 @@ export function createServer(
       const url = new URL(request.url);
       let { pathname } = url;
       const mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+      // The sandbox has no owner cookie; only a current owner-bound media capability passes here.
+      if (owner && PAGE_MEDIA_ROUTE.test(pathname)) {
+        if (request.method !== "GET" && request.method !== "HEAD") return badRequest("method_not_allowed", "use GET");
+        const mediaClient = authClient(bunServer.requestIP(request)?.address ?? null, request.headers);
+        return pageMediaResponse(pathname.slice(PAGE_MEDIA_PATH.length), mediaClient, Date.now(), true)
+          ?? jsonResponse({ error: { code: "not_found", message: "no such page media" } }, 404);
+      }
       let ownerSession = owner?.match(request, mutating) ?? null;
       if (!owner && (pathname.startsWith("/api/owner/") || pathname.startsWith("/api/motoko/"))) return jsonResponse({ error: { code: "owner_gate_required", message: "Owner mode is required" } }, 404);
       if (owner && (pathname.startsWith("/api/") || pathname === "/ws")) {
@@ -1432,7 +1439,10 @@ export function createServer(
         // a page another PC's server asks for through its bridge is played from that server's address, which this one cannot name: it is drawn as before
         const mediaSource = bridgeAuthorized ? null : pageMediaSource(requestHost, isSecureRequest(request), forwarded ? request.headers.get("x-forwarded-host") : null);
         // its media plays only for the client address that rendered it, and ends with that device (file-view.ts)
-        const media = mediaSource === null ? null : { source: mediaSource, client, device: access.level === "full" ? access.device?.id ?? null : null };
+        checkOwner();
+        const mediaSessionId = ownerSession?.id;
+        const media = mediaSource === null ? null : { source: mediaSource, client, device: access.level === "full" ? access.device?.id ?? null : null,
+          owner: owner && mediaSessionId ? { sessionId: mediaSessionId, current: () => owner.current(mediaSessionId) !== null } : undefined };
         return pathname === "/api/fs/stat" ? jsonResponse(found.info) : fileResponse(found.info, url.searchParams.get("download") === "1", url.searchParams.get("render") === "1", media);
       }
 
@@ -1500,7 +1510,8 @@ export function createServer(
             context = pluginPaneContext(snapshot, pane);
           }
           const pluginId = payload.plugin_id;
-          const invoked = await pluginActionInvoke(pluginId, payload.action_id, context);
+          checkOwner();
+          const invoked = await pluginActionInvoke(pluginId, payload.action_id, context, undefined, () => !owner || !!ownerSession && !!owner.current(ownerSession.id));
           return jsonResponse(await waitForPluginAction(
             invoked.log,
             options.pluginActionWaitMs ?? PLUGIN_ACTION_WAIT_MS,

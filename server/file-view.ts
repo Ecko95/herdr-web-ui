@@ -213,7 +213,12 @@ const PAGE_MEDIA_ADDRESSES = 4_096;
 /** Files one render may play from here; past this many a page's media is left as it is, so one page cannot push out every other page's addresses. */
 export const PAGE_MEDIA_PER_RENDER = 50;
 /** Who rendered a page: the client address its media must come from, and the paired device (if any) whose revocation ends it. */
-export interface PageMediaOwner { client: string | null; device: string | null }
+export interface PageMediaOwner {
+  client: string | null;
+  device: string | null;
+  /** Server-owned session proof; never supplied by the rendered page. */
+  owner?: { sessionId: string; current: () => boolean };
+}
 /** What a page may play from here: the policy's media source and who rendered it. */
 export interface PageMedia extends PageMediaOwner { source: string }
 /** What an address serves: the file as its render found it, symlinks resolved, which file that was and in what state, and for whom. */
@@ -231,7 +236,7 @@ function pageMediaUrl(file: string, mime: string, owner: PageMediaOwner, now = D
     pageMediaFiles.delete(old);
   }
   const token = randomBytes(24).toString("base64url");
-  pageMediaFiles.set(token, { file, mime, expires: now + PAGE_MEDIA_LIFETIME_MS, dev: stat.dev, ino: stat.ino, size: stat.size, mtimeMs: stat.mtimeMs, client: owner.client, device: owner.device });
+  pageMediaFiles.set(token, { file, mime, expires: now + PAGE_MEDIA_LIFETIME_MS, dev: stat.dev, ino: stat.ino, size: stat.size, mtimeMs: stat.mtimeMs, client: owner.client, device: owner.device, owner: owner.owner });
   return token;
 }
 
@@ -259,15 +264,19 @@ export function pageMediaSource(host: string | null, secure: boolean, forwardedH
  * never gave it out, it lapsed, another client asks for it, or the file is not the one its
  * render checked.
  */
-export function pageMediaResponse(token: string, client: string | null, now = Date.now()): Response | null {
+export function pageMediaResponse(token: string, client: string | null, now = Date.now(), ownerRequired = false): Response | null {
   const entry = pageMediaFiles.get(token);
-  if (entry === undefined) return null;
+  if (entry === undefined || ownerRequired && !entry.owner) return null;
   if (entry.expires <= now) {
     pageMediaFiles.delete(token);
     return null;
   }
   // an address the page passed on plays nowhere else, answered like an address that never existed
   if (entry.client !== client) return null;
+  if (entry.owner && !entry.owner.current()) {
+    pageMediaFiles.delete(token);
+    return null;
+  }
   // still the file its render checked: a folder on the way swapped for a symlink since, the file
   // replaced or written over in place would serve another one under the address (a new render gives a new address)
   try {
