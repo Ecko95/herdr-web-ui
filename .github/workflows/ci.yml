@@ -139,6 +139,12 @@ jobs:
         with:
           node: 'true'
       - run: bun install --frozen-lockfile
+      - name: Require complete upstream integration
+        run: |
+          if [ -e .github/upstream-sync-conflicts.json ] || [ -L .github/upstream-sync-conflicts.json ]; then
+            echo '::error::Upstream integration is incomplete. Resolve the source merge on this PR branch.'
+            exit 1
+          fi
       - run: bun run check fast
       # A release (package.json's version not tagged yet) must raise REMOTE_BUNDLE_VERSION when the
       # bundle's inputs changed, record the telemetry Worker deploy and carry its patch notes. Only the

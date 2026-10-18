@@ -699,3 +699,62 @@ The server never uses fixture data as a fallback. A configuration change require
 Saved receipts retain their original rig ID, source, and destination. A scope mismatch refuses all queue access and leaves stored bytes unchanged.
 Older receipts without a rig ID also refuse queue access. This change does not migrate or replace those receipts.
 Keep actual deployment values out of source files, browser configuration, and public diagnostics.
+
+## Fork upstream updates
+
+The `Upstream update` workflow prepares PRs from `devswha/herdr-web-ui` main into `Ecko95/herdr-web-ui` main.
+A PR is a request to review changes before a merge.
+The schedule runs at minute 17 every six hours in UTC.
+Use **Actions → Upstream update → Run workflow** on main for a manual request.
+The workflow must exist on the default branch before either event can use it.
+GitHub can delay or drop scheduled runs under high load.
+GitHub disables public repository schedules after 60 days without repository activity.
+A fork must enable Actions before workflows can run.
+See [GitHub's event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+
+The owner must permit Actions to create PRs in the repository settings before this workflow can create its first PR.
+The built-in `GITHUB_TOKEN` needs `contents: write` and `pull-requests: write` for this workflow.
+The workflow also reads checks and commit statuses.
+It needs no personal token, repository secret, or external service.
+A denied request stops the workflow without a credential fallback.
+See [GitHub's PR creation setting](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests).
+
+The workflow keeps one open update PR for main.
+Its branch starts with `automation/upstream-main-`.
+Each later update starts from that PR's current head and merges both fork main and upstream main.
+The workflow preserves human commits and uses ordinary pushes.
+It never force-pushes, auto-merges main, creates a release tag, or dispatches a release.
+A concurrent branch update causes a refusal; a fresh manual run can use the new head.
+A closed, unmerged update PR suppresses automatic recreation for that same upstream revision.
+A new upstream revision permits a new request.
+
+A source conflict produces a draft PR with `.github/upstream-sync-conflicts.json`.
+That report-only draft contains incomplete source integration and must not merge.
+Fast checks refuses the conflict report.
+The PR body names the exact conflict phase and paths.
+
+1. Fetch the update PR branch into a separate development checkout.
+2. Merge current fork main into that branch.
+3. Resolve any source conflicts in that merge.
+4. Merge upstream main into that branch.
+5. Resolve any source conflicts in that merge.
+6. Push an ordinary commit to the same PR branch.
+7. Request another manual workflow run.
+8. Review the source after the workflow removes its conflict report.
+9. Mark the draft ready for review.
+10. Approve the PR workflows after review of all executable changes.
+
+The publisher executes only the trusted script from main.
+It does not execute candidate scripts, dependency hooks, or local candidate actions with write credentials.
+The publisher reports actual PR checks without a claim that it ran those checks itself.
+The report distinguishes `NOT RUN`, `UNKNOWN`, `STALE`, queued, and failed checks.
+Each check snapshot names the candidate commit and its observation time.
+The live PR checks remain the current source between scheduled report updates.
+The workflow artifact retains the complete report when the PR body cannot contain it.
+
+GitHub requires human approval for PR runs from `GITHUB_TOKEN` opened, synchronize, and reopened events.
+A token-generated push does not start ordinary push workflows.
+No personal token or automatic dispatch bypass follows from that limit.
+See [GitHub's token event rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow).
+The existing required checks still control the merge.
+The Motoko review set is conservative; it does not prove that every other path is harmless.
