@@ -5,12 +5,14 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, lstatSync, openSync, closeSync, unlinkSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { chatBridgeEnvironment, type ChatBinding } from "./motoko-config.ts";
-import type { OwnerReadContext } from "./motoko-topology.ts";
+import type { RigModelReader, OwnerReadContext } from "./motoko-topology.ts";
+import type { RigMapModel, SourceValue } from "../shared/motoko-topology.ts";
+import type { Known } from "../shared/motoko.ts";
 import type { ChatAction, ChatMessage, ChatPrompt, ChatView } from "../shared/motoko.ts";
 
 type RecordValue=Record<string,unknown>;
 export interface ChatBridge { command(input:RecordValue):Promise<RecordValue>;close():void }
-export interface ChatRigReader {readRigModel(context:OwnerReadContext,key:string):Promise<{rig:{id:string;key:string};graph:{readCompletedAt:string;staleAfterMs:number}}>}
+export type ChatRigReader=Pick<RigModelReader,"readRigModel">;
 export interface ChatOptions {
  stateDir:string;bindings:ChatBinding[];reader:ChatRigReader;
  connect(binding:ChatBinding,subject:string,sessions:string[],event:(frame:RecordValue)=>void):Promise<ChatBridge>;
@@ -33,6 +35,31 @@ function safeText(value:unknown,max=65536):string {
  return value.replace(/(?:\/(?:[^\s<>"']+\/)*[^\s<>"']+)/g,"[private path]").replace(/(?:Bearer\s+\S+|sk-[A-Za-z0-9_-]+|(?:api[_-]?key|token|password)\s*[=:]\s*\S+)/gi,"[private value]");
 }
 function check(context:OwnerReadContext):void {try{context.signal.throwIfAborted();context.recheck();}catch{fail("owner_required",401);}}
+function bridgeFrame(input:RecordValue,id:string):string {
+ const line=JSON.stringify({id,command:input})+"\n";
+ if(bytes(line)>(input["operation"]==="submit"?1048576:32768))fail("input_too_large",400);
+ return line;
+}
+function contextText(model:RigMapModel,rigKey:string,text:string):string {
+ const known=<T>(v:Known<T>,copy:(value:T)=>T=(value)=>value):Known<T>=>v.state==="known"?{state:"known",value:copy(v.value),observedAt:v.observedAt}:{state:"unknown",reason:v.reason};
+ const source=(v:SourceValue<string>):SourceValue<string>=>({value:known(v.value),source:v.source,readAt:v.readAt});
+ const mapping=(v:{key:string;label:string})=>({key:v.key,label:v.label});
+ const m:RigMapModel={version:model.version,rig:{key:model.rig.key,id:model.rig.id,name:model.rig.name,label:model.rig.label},scope:{ownerProfile:known(model.scope.ownerProfile,mapping),project:known(model.scope.project,mapping)},
+  graph:{state:model.graph.state,readStartedAt:model.graph.readStartedAt,readCompletedAt:model.graph.readCompletedAt,staleAfterMs:model.graph.staleAfterMs,source:model.graph.source,captureRequested:model.graph.captureRequested,
+   pods:model.graph.pods.map(p=>({id:p.id,namespace:p.namespace,label:p.label})),
+   seats:model.graph.seats.map(s=>({id:s.id,logicalId:s.logicalId,podId:s.podId,sessionName:known(s.sessionName),role:source(s.role),runtime:source(s.runtime),model:source(s.model),agentProfile:source(s.agentProfile),sessionStatus:known(s.sessionStatus),startupStatus:known(s.startupStatus),context:{percent:known(s.context.percent),fresh:s.context.fresh,availability:s.context.availability}})),
+   edges:model.graph.edges.map(e=>({id:e.id,sourceId:e.sourceId,targetId:e.targetId,kind:e.kind}))},
+  configuration:{state:model.configuration.state,readStartedAt:model.configuration.readStartedAt,readCompletedAt:model.configuration.readCompletedAt,snapshotId:model.configuration.snapshotId,
+   declared:model.configuration.declared.map(s=>({logicalId:s.logicalId,role:known(s.role),runtime:known(s.runtime),model:known(s.model),agentProfile:known(s.agentProfile),codexConfigProfile:known(s.codexConfigProfile),restorePolicy:known(s.restorePolicy)})),
+   effectiveRuntime:known(model.configuration.effectiveRuntime),omitted:[...model.configuration.omitted],reason:model.configuration.reason},
+  consistency:model.consistency,viewRevision:model.viewRevision,capabilities:{inspect:model.capabilities.inspect,validateDraft:model.capabilities.validateDraft,apply:model.capabilities.apply,hermesAdapter:model.capabilities.hermesAdapter}};
+ if(bytes(JSON.stringify(m))>262144)fail("input_too_large",400);
+ // Snapshot data must not expand runtime @ file references; user text keeps its existing behavior.
+ const envelope=JSON.stringify({version:1,rigKey,preparedAt:new Date().toISOString(),authority:"Read-only snapshot data. No operational authority. Sources and unknown facts remain explicit. Fresh at admission only.",model:m}).replace(/@/g,"\\u0040");
+ const apiText="Rig context snapshot (JSON data):\n"+envelope+"\nUser message:\n"+text;
+ if([...apiText].length>1000000)fail("input_too_large",400);
+ return apiText;
+}
 function privatePath(path:string,directory=false):void {const s=lstatSync(path);if(s.isSymbolicLink()||(directory?!s.isDirectory():!s.isFile())||(s.mode&0o077)!==0||s.uid!==process.getuid?.())fail("chat_store_unavailable",503);}
 
 export class ChatService {
@@ -60,11 +87,15 @@ export class ChatService {
   this.db.query("INSERT OR REPLACE INTO conversations VALUES(?,?)").run(r.id,payload);
  }
  private binding(id:string):ChatBinding {return this.options.bindings.find(b=>b.id===id)??fail("profile_unconfigured",404);}
- private async scoped(context:OwnerReadContext,b:ChatBinding):Promise<void>{
+ private fresh(context:OwnerReadContext,b:ChatBinding,model:RigMapModel):void {
+  check(context);if(!context.allowedRigKeys.has(b.rigKey))fail("rig_not_allowed",404);
+  const age=Date.now()-Date.parse(model.graph.readCompletedAt);
+  if(model.rig.id!==b.rigId||model.rig.key!==b.rigKey||model.graph.staleAfterMs!==30000||!Number.isFinite(age)||age<0||age>30000)fail("rig_scope_unverified");
+ }
+ private async scoped(context:OwnerReadContext,b:ChatBinding):Promise<RigMapModel>{
   check(context);if(!context.allowedRigKeys.has(b.rigKey))fail("rig_not_allowed",404);
   const model=await this.options.reader.readRigModel(context,b.rigKey);check(context);
-  const age=Date.now()-Date.parse(model.graph.readCompletedAt);
-  if(model.rig.id!==b.rigId||model.rig.key!==b.rigKey||!Number.isFinite(age)||age<0||age>model.graph.staleAfterMs)fail("rig_scope_unverified");
+  this.fresh(context,b,model);return model;
  }
  private exclusive<T>(id:string,work:()=>Promise<T>):Promise<T>{
   if(this.busy.has(id))return Promise.reject(new ChatError("conversation_busy"));this.busy.add(id);
@@ -242,10 +273,14 @@ export class ChatService {
     if(r.pending||r.revoke)fail("conversation_busy");if(l.status!=="ready")fail("resync_required");if(l.history!=="ready")fail("history_too_large");
     const memory=await l.bridge.command({operation:"memory",sessionId:r.session});check(context);if(memory["state"]!=="ready"&&memory["state"]!=="uninitialized")fail("memory_binding_unverified");
     if((this.db.query("SELECT count(*) AS count FROM inputs").get() as {count:number}).count>=100000)fail("journal_full");
+    const model=await this.scoped(context,b);
+    const command={operation:"submit",sessionId:r.session,submissionId:action.submissionId,text:action.text,apiText:contextText(model,b.rigKey,action.text)};
+    bridgeFrame(command,"9".repeat(32));
+    this.fresh(context,b,model);
     r.pending={id:action.submissionId,text:action.text,digest:digest(action.text),admission:null,status:"unknown",generation:null};r.outcome=null;
     this.db.transaction(()=>{this.db.query("INSERT INTO inputs VALUES(?,?,?,'unknown')").run(action.submissionId,id,digest(action.text));this.save(r);})();
     check(context);
-    try{const result=await l.bridge.command({operation:"submit",sessionId:r.session,submissionId:action.submissionId,text:action.text});this.receipt(r,result);}
+    try{const result=await l.bridge.command(command);this.receipt(r,result);}
     catch{if(r.pending)r.pending.status="unknown";this.save(r);l.status="outcome_unknown";l.bridge.close();this.live.delete(r.id);}
     check(context);return this.view(context,r,l);
    }
@@ -273,7 +308,7 @@ export async function attachChatBridge(child:BridgeProcess,config:RecordValue,ev
  const reader=child.stdout.getReader();
  const close=()=>{if(closed)return;closed=true;readyReject(new ChatError("outcome_unknown",503));for(const p of pending.values()){clearTimeout(p.timer);p.reject(new ChatError("outcome_unknown",503));}pending.clear();child.stdin.end();void reader.cancel().catch(()=>{});};
  const startup=setTimeout(close,25000);
- const send=async(value:RecordValue)=>{const line=JSON.stringify(value)+"\n";if(bytes(line)>65536)fail("input_too_large",400);await child.stdin.write(line);await child.stdin.flush();};
+ const send=async(value:RecordValue)=>{const line=JSON.stringify(value)+"\n";if(bytes(line)>(object(value["command"])&&value["command"]["operation"]==="submit"?1048576:65536))fail("input_too_large",400);await child.stdin.write(line);await child.stdin.flush();};
  void (async()=>{
   let held=new Uint8Array(0);const decoder=new TextDecoder("utf-8",{fatal:true});
   try{while(!closed){const chunk=await reader.read();if(chunk.done)break;
@@ -296,7 +331,7 @@ export async function attachChatBridge(child:BridgeProcess,config:RecordValue,ev
   if(closed)return Promise.reject(new ChatError("outcome_unknown",503));
   const id=String(++sequence);
   return new Promise<RecordValue>((resolve,reject)=>{
-   if(bytes(JSON.stringify({id,command:input})+"\n")>32768){reject(new ChatError("input_too_large",400));return;}
+   try{bridgeFrame(input,id);}catch(error){reject(error instanceof Error?error:new ChatError("input_too_large",400));return;}
    const timer=setTimeout(()=>{pending.delete(id);reject(new ChatError("outcome_unknown",503));close();},7000);
    pending.set(id,{resolve,reject,timer});void send({id,command:input}).catch(()=>close());
   });

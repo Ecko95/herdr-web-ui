@@ -849,3 +849,28 @@ Owner revocation blocks later browser reads and effects. The server retains a ca
 It attempts Stop for the recorded admission, then detaches its viewer. An unresolved remote outcome stays explicit.
 Viewer detach does not prove remote termination across a crash. This component provides no hard remote stop guarantee.
 No real profile, endpoint or credential belongs in public documentation, browser errors or logs.
+
+
+### Hermes rig context at admission
+
+Motoko reads a fresh, typed `RigMapModel` for the selected Chat binding before each new submission.
+The existing owner scope, approved catalog, rig key, and rig ID constrain this read.
+An absent owner-profile mapping stays unknown. A profile label does not establish a mapping.
+
+The private bridge sends the safe model through canonical `api_text` with the original submission ID.
+The separate `text` field preserves the original user message in history.
+The model includes source times, separate graph and configuration reads, omitted fields, and unknown facts.
+The snapshot supplies data only. It grants no configuration edit authority.
+
+Snapshot JSON escapes literal `@` values before Hermes expands file references.
+The original user text keeps its existing reference behavior.
+A failed model read or encoded overflow refuses the send before journal insertion.
+A duplicate submission or unknown outcome does not cause another submit.
+Private submit frames have a 1,048,576-byte limit. Other private commands retain their 32,768-byte limit.
+The public input limit remains unchanged.
+
+The snapshot is fresh at admission preparation. Queue delay can make it older before inference.
+The normal GUI route must preserve `api_text`; an unsupported managed GUI policy must refuse before execution.
+This contract does not cover bypass or other managed-worker routes.
+Actual acceptance requires a separately approved test with the selected owner profile and real source data.
+Source tests do not establish runtime installation, complete fleet coverage, host isolation, or hard remote termination.

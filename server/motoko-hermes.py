@@ -135,7 +135,7 @@ class HermesBridge:
         operation = command.get("operation")
         fields = {
             "create":{"requestId"}, "resume":{"sessionId"}, "memory":{"sessionId"},
-            "submit":{"sessionId","submissionId","text"}, "receipt":{"sessionId","admissionId"},
+            "submit":{"sessionId","submissionId","text","apiText"}, "receipt":{"sessionId","admissionId"},
             "stop":{"sessionId","admissionId"}, "events":{"sessionId","replayEpoch","lastSequence"},
             "detach":{"sessionId","subscriptionId"}, "resolve":{"sessionId","admissionId","generation"},
             "approve":{"sessionId","promptId","generation","choice"},
@@ -165,17 +165,20 @@ class HermesBridge:
         if operation == "submit":
             submission_id = command["submissionId"]
             text = command["text"]
+            api_text = command["apiText"]
             if (not isinstance(submission_id, str) or not re.fullmatch(r"[a-f0-9]{32}", submission_id)
-                    or not isinstance(text, str) or not text.strip()):
+                    or not isinstance(text, str) or not text.strip()
+                    or not isinstance(api_text, str) or not api_text.strip()):
                 raise BridgeError("invalid_request")
             try:
-                if len(text.encode("utf8")) > 16384:
+                if (len(text.encode("utf8")) > 16384 or len(api_text) > 1000000
+                        or len((json.dumps({"id":"9"*32,"command":command},ensure_ascii=False,separators=(",",":"))+"\n").encode("utf8")) > 1048576):
                     raise BridgeError("input_too_large")
             except UnicodeError:
                 raise BridgeError("invalid_request") from None
             if (await self.memory_status(session))["state"] == "failed":
                 raise BridgeError("memory_binding_unverified")
-            return self.receipt(await self._rpc("prompt.submit", session_id=session, text=text, submission_id=submission_id), session)
+            return self.receipt(await self._rpc("prompt.submit", session_id=session, text=text, api_text=api_text, submission_id=submission_id), session)
         if operation == "resolve":
             generation = command["generation"]
             if type(generation) is not int or generation < 1:
@@ -233,10 +236,10 @@ async def open_bridge(binding, subject, owned_sessions, discover, connect):
 async def run_protocol(bridge, read, write):
     async def commands():
         while True:
-            line = await read(32769)
+            line = await read(1048577)
             if not line:
                 return
-            if len(line) > 32768 or not line.endswith(b"\n"):
+            if len(line) > 1048576 or not line.endswith(b"\n"):
                 await write({"kind":"error", "id":None, "code":"input_too_large"})
                 return
             request_id = None
@@ -244,6 +247,8 @@ async def run_protocol(bridge, read, write):
                 command = json.loads(line)
                 if not isinstance(command, dict) or set(command) != {"id", "command"}:
                     raise BridgeError("invalid_request")
+                if len(line) > (1048576 if isinstance(command["command"],dict) and command["command"].get("operation")=="submit" else 32768):
+                    raise BridgeError("input_too_large")
                 request_id = identifier(command["id"])
                 result = await bridge.command(command["command"])
                 await write({"kind":"result", "id":request_id, "result":result})

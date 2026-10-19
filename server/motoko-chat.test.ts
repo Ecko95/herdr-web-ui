@@ -1,10 +1,17 @@
 import { test, expect } from "bun:test";
-import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { RigMapModel } from "../shared/motoko-topology.ts";
 import type { ChatAction } from "../shared/motoko.ts";
 import * as chat from "./motoko-chat.ts";
 const binding={id:"a".repeat(32),revision:1,rigKey:"alpha",rigId:"01ARZ3NDEKTSV4RRFFQ69G5FAV",label:"Alpha",profile:"alpha",home:"/fiction/profiles/alpha",bank:"alpha",workspace:"/fiction/workspace",endpoint:"http://127.0.0.1:7434",runtime:"/fiction/runtime",python:"/fiction/python",revisionSha:"b".repeat(40)};
+function rigModel():RigMapModel {
+ const at=new Date().toISOString(),unknown={state:"unknown" as const,reason:"not_reported"};
+ return {version:1,rig:{id:binding.rigId,key:"alpha",name:"alpha",label:'Alpha @fiction "漢字" \\ data'},scope:{ownerProfile:unknown,project:unknown},
+ graph:{state:"known",readStartedAt:at,readCompletedAt:at,staleAfterMs:30000,source:"OpenRig",captureRequested:false,pods:[{id:"pod-one",namespace:"team",label:"Team"}],seats:[{id:"seat-one",logicalId:"team.one",podId:"pod-one",sessionName:unknown,role:{value:unknown,source:"graph",readAt:at},runtime:{value:unknown,source:"graph",readAt:at},model:{value:unknown,source:"spec-export",readAt:at},agentProfile:{value:unknown,source:"spec-export",readAt:at},sessionStatus:unknown,startupStatus:unknown,context:{percent:unknown,fresh:false,availability:"unknown"}}],edges:[]},
+ configuration:{state:"unknown",readStartedAt:at,readCompletedAt:at,snapshotId:null,declared:[],effectiveRuntime:{state:"unknown",reason:"complete_runtime_configuration_not_reported"},omitted:["paths","instructions","credentials","hooks","resume","resource-bodies"],reason:"source_unavailable"},consistency:"separate-reads",viewRevision:"fiction-one",capabilities:{inspect:true,validateDraft:false,apply:false,hermesAdapter:false}};
+}
 function fixture(){
  const dir=mkdtempSync(join(tmpdir(),"motoko-chat-test-"));let connections=0;let valid=true,unknown=false,memory="uninitialized",lost=false;const calls:Record<string,unknown>[]=[];const hooks=new Map<string,()=>void|Promise<void>>();
  let stoppedResolve!:()=>void;const stopped=new Promise<void>(resolve=>stoppedResolve=resolve);
@@ -12,7 +19,7 @@ function fixture(){
  let onEvent:(frame:Record<string,unknown>)=>void=()=>{};
  const snapshot={session_id:"session-one",authority_epoch:7,replay_epoch:"epoch-one",last_sequence:0,subscription_id:"subscription-one",execution_generation:0,messages:[{role:"user",content:"literal <script> text"}],pending:[],prompts:[],running:false};
  const connect=async(_binding?:unknown,_subject?:unknown,_sessions?:unknown,event?:(frame:Record<string,unknown>)=>void)=>{connections++;if(event)onEvent=event;return ({async command(c:Record<string,unknown>){calls.push(c);await hooks.get(String(c["operation"]))?.();if(c["operation"]==="stop")stoppedResolve();if(c["operation"]==="create"||c["operation"]==="resume")return snapshot;if(c["operation"]==="memory")return {state:memory};if(c["operation"]==="submit"){if(unknown)throw Error("secret raw transport");return {admission_id:"admission-one",status:"started",execution_generation:2};}if(c["operation"]==="resolve"){lost=false;return {admission_id:"admission-one",status:"terminal",outcome:"unknown_acknowledged",execution_generation:2};}if(c["operation"]==="receipt"||c["operation"]==="stop")return {admission_id:"admission-one",status:lost?"unknown":"terminal",outcome:"interrupted",execution_generation:2};return {};},close(){}});};
- const reader={async readRigModel(){return {rig:{id:binding.rigId,key:"alpha"},graph:{readCompletedAt:new Date().toISOString(),staleAfterMs:30000}};}};
+ const reader={async readRigModel(){return rigModel();}};
  const service=new chat.ChatService({stateDir:dir,bindings:[binding],reader,connect});
  return {service,dir,context,stopped,calls,hooks,connectionCount(){return connections;},connect,reader,snapshot,event(frame:Record<string,unknown>){onEvent(frame);},revoke(){valid=false;controller.abort();},lost(){lost=true;},ready(){memory="ready";},failed(){memory="failed";},unknown(){unknown=true;},cleanup(){service.close();rmSync(dir,{recursive:true,force:true});}};
 }
@@ -53,7 +60,7 @@ test("revocation attempts cancellation of the exact admitted input",async()=>{
  const f=fixture();try{const view=await f.service.open(f.context,binding.id,"1".repeat(32));await f.service.act(f.context,view.conversationId,view.writerGeneration,"1".repeat(32),{operation:"send",submissionId:"2".repeat(32),text:"hello"});f.revoke();await f.stopped;expect(f.calls).toContainEqual({operation:"stop",sessionId:"session-one",admissionId:"admission-one"});await expect(f.service.act(f.context,view.conversationId,view.writerGeneration,"1".repeat(32),{operation:"send",submissionId:"3".repeat(32),text:"no"})).rejects.toThrow("owner_required");}finally{f.cleanup();}
 });
 test("the service refuses stale evidence and raw private projection values",async()=>{
- const f=fixture();f.service.close();const reader={async readRigModel(){return {rig:{id:binding.rigId,key:"alpha"},graph:{readCompletedAt:"2000-01-01T00:00:00Z",staleAfterMs:30000}};}};
+ const f=fixture();f.service.close();const reader={async readRigModel(){const m=rigModel();m.graph.readCompletedAt="2000-01-01T00:00:00Z";return m;}};
  const service=new chat.ChatService({stateDir:f.dir,bindings:[binding],reader,connect:f.connect});try{await expect(service.open(f.context,binding.id,"1".repeat(32))).rejects.toThrow("rig_scope_unverified");expect(f.calls).toHaveLength(0);}finally{service.close();f.cleanup();}
 });
 
@@ -228,4 +235,70 @@ test("revocation during the scope read prevents an effect",async()=>{
  const f=fixture();try{const v=await f.service.open(f.context,binding.id,"1".repeat(32));const read=f.reader.readRigModel;f.reader.readRigModel=async()=>{const value=await read();f.revoke();return value;};
  await expect(f.service.act(f.context,v.conversationId,v.writerGeneration,"1".repeat(32),{operation:"send",submissionId:"2".repeat(32),text:"blocked"})).rejects.toThrow("owner_required");expect(f.calls.some(c=>c["operation"]==="submit")).toBe(false);expect(f.calls.at(-1)?.["operation"]).toBe("detach");
  }finally{f.cleanup();}
+});
+
+test("each explicit send carries the complete projected model with its original identity",async()=>{
+ const f=fixture();try{
+  const v=await f.service.open(f.context,binding.id,"1".repeat(32));const model=rigModel();
+  const at=model.graph.readCompletedAt;
+  model.scope.project={state:"known",value:{key:"project",label:"Project"},observedAt:at};
+  model.graph.seats[0]!.role={value:{state:"known",value:"reviewer",observedAt:at},source:"graph",readAt:at};
+  model.graph.edges=[{id:"edge-one",sourceId:"seat-one",targetId:"seat-two",kind:"delegates_to"}];
+  model.configuration={...model.configuration,state:"known",readStartedAt:"2001-01-01T00:00:00Z",readCompletedAt:at,snapshotId:"snapshot-one",reason:null,declared:[{logicalId:"team.one",role:{state:"known",value:"reviewer",observedAt:at},runtime:{state:"unknown",reason:"not_reported"},model:{state:"unknown",reason:"not_reported"},agentProfile:{state:"unknown",reason:"not_reported"},codexConfigProfile:{state:"unknown",reason:"not_reported"},restorePolicy:{state:"unknown",reason:"not_reported"}}]};
+  const expected=structuredClone(model);
+  Object.assign(model,{rawSpec:"forbidden-root"});Object.assign(model.graph,{hooks:"forbidden-graph"});
+  Object.assign(model.graph.seats[0]!.role,{raw:"forbidden-field"});
+  let reads=0;f.reader.readRigModel=async()=>{reads++;return model;};
+  const send=(id:string)=>f.service.act(f.context,v.conversationId,v.writerGeneration,"1".repeat(32),{operation:"send",submissionId:id,text:"hello user"});
+  await send("2".repeat(32));const first=f.calls.find(c=>c["operation"]==="submit")!;
+  if(process.env["MOTOKO_CONTEXT_FIXTURE"])writeFileSync(process.env["MOTOKO_CONTEXT_FIXTURE"],JSON.stringify(first));
+  expect(first["text"]).toBe("hello user");expect(first["submissionId"]).toBe("2".repeat(32));
+  const api=String(first["apiText"]);expect(api).toContain("\\u0040fiction");expect(api).not.toContain("@fiction");expect(api).toEndWith("hello user");expect(api).not.toContain("forbidden-");
+  const envelope=JSON.parse(api.split("\n")[1]!);expect(envelope.rigKey).toBe("alpha");
+  expect(envelope.model).toEqual(expected);
+  expect(envelope.model.rig).toEqual(model.rig);expect(envelope.model.configuration).toEqual(model.configuration);
+  expect(envelope.model.graph.seats[0].role).toEqual({value:model.graph.seats[0]!.role.value,source:"graph",readAt:model.graph.seats[0]!.role.readAt});
+  expect(envelope.model.consistency).toBe("separate-reads");expect(envelope.model.scope).toEqual(model.scope);
+  await send("2".repeat(32));expect(f.calls.filter(c=>c["operation"]==="submit")).toHaveLength(1);
+  await f.service.act(f.context,v.conversationId,v.writerGeneration,"1".repeat(32),{operation:"stop"});
+  model.viewRevision="fiction-two";await send("3".repeat(32));expect(reads).toBeGreaterThan(1);
+  expect(String(f.calls.filter(c=>c["operation"]==="submit")[1]!["apiText"])).toContain("fiction-two");
+ }finally{f.cleanup();}
+});
+for(const problem of ["stale","future","wrong-id","wrong-key","failure","revoked","oversized","encoded-overflow"]){
+ test(`context ${problem} refuses before journal insertion`,async()=>{
+  const f=fixture();try{const v=await f.service.open(f.context,binding.id,"1".repeat(32));
+   // The memory hook changes only the model read after memory verification.
+   f.hooks.set("memory",()=>{f.reader.readRigModel=async()=>{
+    const m=rigModel();if(problem==="stale")m.graph.readCompletedAt="2000-01-01T00:00:00Z";
+    if(problem==="future")m.graph.readCompletedAt="2099-01-01T00:00:00Z";
+    if(problem==="wrong-id")m.rig.id="other";if(problem==="wrong-key")m.rig.key="other";
+    if(problem==="failure")throw Error("source unavailable");if(problem==="revoked")f.revoke();
+    if(problem==="oversized")m.rig.label="x".repeat(262145);if(problem==="encoded-overflow")m.rig.label="@".repeat(200000);return m;
+   };});
+   const action={operation:"send" as const,submissionId:"7".repeat(32),text:"hello"};
+   await expect(f.service.act(f.context,v.conversationId,v.writerGeneration,"1".repeat(32),action)).rejects.toThrow();
+   expect(f.calls.some(c=>c["operation"]==="submit")).toBe(false);
+   if(problem!=="revoked"){
+    f.hooks.delete("memory");f.reader.readRigModel=async()=>rigModel();
+    await f.service.act(f.context,v.conversationId,v.writerGeneration,"1".repeat(32),action);
+    expect(f.calls.filter(c=>c["operation"]==="submit")).toHaveLength(1);
+   }
+  }finally{f.cleanup();}
+ });
+}
+
+test("freshness and owner authority are checked again after context serialization",async()=>{
+ for(const problem of ["age","owner"]){
+  const f=fixture();const realNow=Date.now;let clock=realNow();
+  try{const v=await f.service.open(f.context,binding.id,"1".repeat(32));clock=realNow();Date.now=()=>clock;
+   f.hooks.set("memory",()=>{f.reader.readRigModel=async()=>{
+    const model=rigModel();model.graph.readCompletedAt=new Date(clock).toISOString();Object.defineProperty(model,"viewRevision",{get(){if(problem==="age")clock+=30001;else f.revoke();return "revision";}});return model;
+   };});
+   const action={operation:"send" as const,submissionId:"8".repeat(32),text:"hello"};
+   await expect(f.service.act(f.context,v.conversationId,v.writerGeneration,"1".repeat(32),action)).rejects.toThrow(problem==="age"?"rig_scope_unverified":"owner_required");
+   expect(f.calls.some(c=>c["operation"]==="submit")).toBe(false);
+   if(problem==="age"){Date.now=realNow;f.hooks.delete("memory");f.reader.readRigModel=async()=>rigModel();await f.service.act(f.context,v.conversationId,v.writerGeneration,"1".repeat(32),action);expect(f.calls.filter(c=>c["operation"]==="submit")).toHaveLength(1);}
+  }finally{Date.now=realNow;f.cleanup();}
+ }
 });

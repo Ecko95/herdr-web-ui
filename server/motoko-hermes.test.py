@@ -1,4 +1,5 @@
 import asyncio
+import json
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -50,7 +51,7 @@ class BridgeTests(unittest.TestCase):
         module = self.load(); bridge, calls = self.client(module)
         async def run():
             await bridge.initialize(); await bridge.command({"operation":"create", "requestId":"1" * 32})
-            return await bridge.command({"operation":"submit", "sessionId":"session-alpha", "submissionId":"2" * 32, "text":"fictional input"})
+            return await bridge.command({"operation":"submit", "sessionId":"session-alpha", "submissionId":"2" * 32, "text":"fictional input", "apiText":"snapshot\nfictional input"})
         with self.assertRaisesRegex(module.BridgeError, "outcome_unknown") as error: asyncio.run(run())
         self.assertNotIn("credential", str(error.exception))
         self.assertEqual(len([m for m,p in calls if m == "prompt.submit"]), 1)
@@ -170,7 +171,7 @@ class ProtocolTests(unittest.TestCase):
             await bridge.initialize();await bridge.command({"operation":"create","requestId":"1"*32})
             self.assertEqual((await bridge.command({"operation":"memory","sessionId":"session-alpha"}))["state"],"failed")
             with self.assertRaisesRegex(module.BridgeError,"memory_binding_unverified"):
-                await bridge.command({"operation":"submit","sessionId":"session-alpha","submissionId":"2"*32,"text":"hello"})
+                await bridge.command({"operation":"submit","sessionId":"session-alpha","submissionId":"2"*32,"text":"hello","apiText":"snapshot\nhello"})
         asyncio.run(run());self.assertFalse(any(m=="prompt.submit" for m,p in calls))
 
     def test_create_sets_snapshot_watermark(self):
@@ -235,5 +236,48 @@ class ReconciliationTests(unittest.TestCase):
             await bridge.command({"operation":"stop","sessionId":"session-alpha","admissionId":"admission-alpha"})
         with self.assertRaisesRegex(module.BridgeError,"invalid_response"):asyncio.run(run())
         self.assertFalse(any(method=="session.interrupt" for method,params in calls))
+
+class ContextTests(unittest.TestCase):
+    load = BridgeTests.load
+    client = BridgeTests.client
+
+    def test_canonical_submit_preserves_text_and_model_input(self):
+        module=self.load();bridge,calls=self.client(module);original=bridge.client.rpc
+        async def rpc(method,**params):
+            if method=="prompt.submit":
+                calls.append((method,params));return {"status":"queued","admission_id":"admission-alpha","authority_epoch":7,"ref":{"profile_id":BINDING["home"],"session_id":"session-alpha"}}
+            return await original(method,**params)
+        bridge.client.rpc=rpc
+        async def run():
+            await bridge.initialize();await bridge.command({"operation":"create","requestId":"1"*32})
+            await bridge.command({"operation":"submit","sessionId":"session-alpha","submissionId":"2"*32,"text":"hello","apiText":"snapshot\nhello"})
+        asyncio.run(run())
+        self.assertEqual([p for m,p in calls if m=="prompt.submit"],[{"_timeout":5,"session_id":"session-alpha","submission_id":"2"*32,"text":"hello","api_text":"snapshot\nhello"}])
+
+    def test_missing_or_invalid_context_refuses_before_rpc(self):
+        module=self.load();bridge,calls=self.client(module)
+        async def run():
+            await bridge.initialize();await bridge.command({"operation":"create","requestId":"1"*32})
+            for extra in [{},{"apiText":None},{"apiText":""},{"apiText":"x"*1000001}]:
+                with self.assertRaises(module.BridgeError):
+                    await bridge.command({"operation":"submit","sessionId":"session-alpha","submissionId":"2"*32,"text":"hello",**extra})
+        asyncio.run(run());self.assertFalse(any(m=="prompt.submit" for m,p in calls))
+
+    def test_protocol_measures_complete_utf8_submit_frames(self):
+        module=self.load()
+        for operation,count,accepted in [("submit",12000,True),("memory",12000,False),("submit",180000,False)]:
+            bridge,calls=self.client(module)
+            async def run():
+                await bridge.initialize();bridge.client.events=asyncio.Queue();output=[];seen=[]
+                async def command(value):seen.append(value);return {"ok":True}
+                bridge.command=command
+                frame=(json.dumps({"id":"context","command":{"operation":operation,"apiText":"漢字"*count}},ensure_ascii=False)+"\n").encode()
+                lines=iter([frame,b""])
+                async def read(limit):return next(lines)
+                async def write(value):output.append(value)
+                await asyncio.wait_for(module.run_protocol(bridge,read,write),1)
+                self.assertEqual(bool(seen),accepted)
+                self.assertEqual(output[0]["kind"],"result" if accepted else "error")
+            asyncio.run(run())
 
 if __name__ == "__main__": unittest.main()

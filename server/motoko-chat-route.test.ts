@@ -30,3 +30,12 @@ test("writer recovery uses the closed owner route with no extra fields",async()=
  expect((await chat.handleChatRequest(post({...input,force:true}),service,context,"https://app.example")).status).toBe(400);expect(received).toBeUndefined();
  expect((await chat.handleChatRequest(post(input),service,context,"https://app.example")).status).toBe(200);expect(received).toEqual([context,input.conversationId,7,input.writerId,{operation:"recover"}]);
 });
+
+test("browser sends cannot supply model context or transport authority",async()=>{
+ let calls=0;const service={list(){return [];},async open(){throw Error("unexpected");},async act(){calls++;return {} as never;}};
+ for(const field of ["apiText","context","model","endpoint","profile","rigKey"]){
+  const request=post({operation:"send",conversationId:"a".repeat(32),writerGeneration:1,writerId:"b".repeat(32),submissionId:"c".repeat(32),text:"hello",[field]:"override"});
+  expect((await chat.handleChatRequest(request,service,context,"https://app.example")).status).toBe(400);
+ }
+ expect(calls).toBe(0);
+});
