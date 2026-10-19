@@ -72,9 +72,9 @@ describe("Motoko destinations", () => {
   it("offers only real owner destinations and routes each action", () => {
     const opened: string[] = [];
     const entries = motokoEntries(identity, (destination) => opened.push(destination));
-    expect(entries.map((entry) => entry.id)).toEqual(["motoko", "motoko-status", "motoko-map", "motoko-health", "motoko-requests", "motoko-sessions", "motoko-passkey"]);
+    expect(entries.map((entry) => entry.id)).toEqual(["motoko", "motoko-status", "motoko-map", "motoko-chat", "motoko-health", "motoko-requests", "motoko-sessions", "motoko-passkey"]);
     for (const entry of entries) entry.run();
-    expect(opened).toEqual(["boot", "status", "map", "health", "requests", "sessions", "passkey"]);
+    expect(opened).toEqual(["boot", "status", "map", "chat", "health", "requests", "sessions", "passkey"]);
     expect(motokoEntries(identity, null)).toEqual([]);
   });
 

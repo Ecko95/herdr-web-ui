@@ -37,6 +37,7 @@ export function motokoEntries(t: Translate, open: AppActions["openMotoko"]) {
     { id: "motoko", label: "Motoko", run: () => open("boot") },
     { id: "motoko-status", label: t("Motoko status"), run: () => open("status") },
     { id: "motoko-map", label: t("Rig map"), run: () => open("map") },
+    { id: "motoko-chat", label: t("Chat"), run: () => open("chat") },
     { id: "motoko-health", label: t("VPS health"), run: () => open("health") },
     { id: "motoko-requests", label: t("Motoko requests"), run: () => open("requests") },
     { id: "motoko-sessions", label: t("Active logins"), run: () => open("sessions") },
@@ -49,6 +50,7 @@ export function actionAliases(t: Translate): Readonly<Record<string, string>> {
   return {
     motoko: t("owner workspace rigs seats"),
     "motoko-status": t("motoko rig seat status activity context"),
+    "motoko-chat": t("chat hermes conversation messages memory"),
     "motoko-map": t("map topology relationships teams projects rigs configuration"),
     "motoko-health": t("cpu vps memory uptime health"),
     "motoko-requests": t("motoko requests queue results"),

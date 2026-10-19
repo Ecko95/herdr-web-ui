@@ -2164,3 +2164,16 @@ The server cancels an incomplete Save body after five seconds or owner revocatio
 A completed explicit Refresh and same-seat selection restore the form after a result.
 Periodic refresh preserves user input, a pending Save and an Unknown result.
 This control does not restart the current native session.
+
+
+## Motoko Hermes chat
+
+The interaction follows T3 Code's explicit composer and thread Stop controls.
+The comparison uses its [composer documentation](https://github.com/pingdotgg/t3code/blob/main/docs/user/keybindings.md#composer-controls).
+Its [thread Stop command](https://github.com/pingdotgg/t3code/blob/main/docs/user/keybindings.md#commands-with-special-behavior) targets the current thread.
+Motoko targets the canonical admission and its recorded execution generation.
+This source adds no queue or steer option. One unresolved input blocks another send in the same conversation.
+A separate confirmation explains the effect of a lost-turn acknowledgement.
+The profile and rig remain visible above the history and composer. The owner selects an approved profile before the first connection.
+The view uses existing Motoko buttons, tokens and the confirmation dialog. Native controls keep keyboard and screen reader access.
+The implementation copies no T3 Code source or visual assets.

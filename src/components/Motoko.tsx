@@ -1,3 +1,4 @@
+import { MotokoChat } from "./MotokoChat.tsx";
 import { MotokoMap } from "./MotokoMap.tsx";
 /**
  * Motoko: the owner's view of rigs and seats, over the pane area (App.tsx, `?page=motoko`), and
@@ -66,6 +67,7 @@ export function Motoko({ auth, request, onClose, onSignOut, onSessionEnded }: Mo
           <button type="button" role="tab" aria-selected={tab === "status"} className="btn btn-ghost" onClick={() => setTab("status")}>{t("Status")}</button>
           <button type="button" role="tab" aria-selected={tab === "map"} className="btn btn-ghost" onClick={() => setTab("map")}>{t("Map")}</button>
           <button type="button" role="tab" aria-selected={tab === "health"} className="btn btn-ghost" onClick={() => setTab("health")}>{t("VPS health")}</button>
+          <button type="button" role="tab" aria-selected={tab === "chat"} className="btn btn-ghost" onClick={() => setTab("chat")}>{t("Chat")}</button>
           <button type="button" role="tab" aria-selected={tab === "requests"} className="btn btn-ghost" onClick={() => setTab("requests")}>{t("Requests")}</button>
           <button type="button" role="tab" aria-selected={tab === "access"} className="btn btn-ghost" onClick={() => setTab("sessions")}>{t("Access")}</button>
         </div>
@@ -73,7 +75,7 @@ export function Motoko({ auth, request, onClose, onSignOut, onSessionEnded }: Mo
       </header>
       {!owner
         ? <p className="motoko-note" role="status">{t("Motoko needs owner passkey sign-in on this server. It shows nothing without it.")}</p>
-        : tab === "boot" ? <MotokoBoot onStatus={() => setTab("status")} onSessionEnded={onSessionEnded} /> : tab === "status" ? <StatusView onSessionEnded={onSessionEnded} /> : tab === "map" ? <MotokoMap onSessionEnded={onSessionEnded} /> : tab === "health" ? <HealthView onSessionEnded={onSessionEnded} /> : tab === "requests" ? <RequestsView onSessionEnded={onSessionEnded} /> : <AccessView request={selected} onSignOut={onSignOut} onSessionEnded={onSessionEnded} />}
+        : tab === "boot" ? <MotokoBoot onStatus={() => setTab("status")} onSessionEnded={onSessionEnded} /> : tab === "status" ? <StatusView onSessionEnded={onSessionEnded} /> : tab === "map" ? <MotokoMap onSessionEnded={onSessionEnded} /> : tab === "health" ? <HealthView onSessionEnded={onSessionEnded} /> : tab === "chat" ? <MotokoChat onSessionEnded={onSessionEnded} /> : tab === "requests" ? <RequestsView onSessionEnded={onSessionEnded} /> : <AccessView request={selected} onSignOut={onSignOut} onSessionEnded={onSessionEnded} />}
     </section>
   );
 }

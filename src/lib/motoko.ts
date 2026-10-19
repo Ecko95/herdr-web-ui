@@ -143,3 +143,8 @@ export const fetchRigCatalog = (signal?:AbortSignal):Promise<RigCatalog> => requ
 export const fetchRigModel = (key:string,signal?:AbortSignal):Promise<RigMapModel> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}`,"GET",undefined,signal);
 export const validateRigDraft = (key:string,input:RigDraftRequest,signal?:AbortSignal):Promise<RigDraftResult> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}/validate`,"POST",input,signal);
 export const saveSeatModel = (key:string,input:ModelSaveInput):Promise<ModelSaveResult> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}/model`,"POST",input);
+
+/** Chat calls never retry a send after an unknown transport result. */
+export const listChatBindings=(signal?:AbortSignal):Promise<{bindings:import("../../shared/motoko.ts").ChatBindingView[]}>=>request("/api/motoko/chat","POST",{operation:"list"},signal);
+export const openChat=(bindingId:string,writerId:string,signal?:AbortSignal):Promise<import("../../shared/motoko.ts").ChatView>=>request("/api/motoko/chat","POST",{operation:"open",bindingId,writerId},signal);
+export const actChat=(view:import("../../shared/motoko.ts").ChatView,writerId:string,action:import("../../shared/motoko.ts").ChatAction,signal?:AbortSignal):Promise<import("../../shared/motoko.ts").ChatView>=>request("/api/motoko/chat","POST",{conversationId:view.conversationId,writerGeneration:view.writerGeneration,writerId,...action},signal);

@@ -30,7 +30,7 @@ it("offers no action outside an authenticated owner session", async () => {
 it("opens each destination and repeats a focus request", async () => {
   await mount(owner);
   expect(navigation.request).toBeNull();
-  for (const destination of ["boot", "status", "map", "health", "requests", "sessions", "passkey"] as const) {
+  for (const destination of ["boot", "status", "map", "chat", "health", "requests", "sessions", "passkey"] as const) {
     await act(async () => navigation.open!(destination));
     expect(navigation.request?.destination).toBe(destination);
   }

@@ -1,3 +1,5 @@
+import { realpathSync } from "node:fs";
+import { isAbsolute, normalize } from "node:path";
 /** Private startup scope. Request fields never select this target. */
 export interface MotokoTarget { rigId: string; rigName: string; sourceSession: string; humanId: string; destinationSession: string }
 
@@ -51,4 +53,38 @@ export function motokoMapScopeFromEnv(env: Record<string, string | undefined>): 
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new Error("invalid_map_scope"); }
   return mapScope(raw, null)!;
+}
+
+/** Private owner-selected records. An absent mapping never selects a default profile. */
+export interface ChatBinding {
+ id:string; revision:number; rigKey:string; rigId:string; label:string; profile:string; home:string; bank:string;
+ workspace:string; endpoint:string; runtime:string; python:string; revisionSha:string;
+}
+export function chatBindings(text:string|undefined, scope:MotokoMapScope|null, canonical:(path:string)=>string=realpathSync):ChatBinding[] {
+ if(text===undefined)return [];
+ const bad=():never=>{throw new Error("invalid_chat_binding");};
+ if(Buffer.byteLength(text)>65536)return bad();
+ let raw:unknown;try{raw=JSON.parse(text);}catch{return bad();}
+ if(!Array.isArray(raw)||raw.length>32)return bad();
+ const ids=new Set<string>(),rigs=new Set<string>();
+ return raw.map(value=>{
+  if(value===null||typeof value!=="object"||Array.isArray(value))return bad();
+  const r=value as Record<string,unknown>;
+  const keys=["id","revision","rigKey","rigId","label","profile","home","bank","workspace","endpoint","runtime","python","revisionSha"];
+  if(Object.keys(r).length!==keys.length||keys.some(k=>!(k in r)))return bad();
+  if(typeof r["id"]!=="string"||!/^([a-f0-9]{32})$/.test(r["id"])||ids.has(r["id"])||!Number.isSafeInteger(r["revision"])||Number(r["revision"])<1||
+   typeof r["rigKey"]!=="string"||rigs.has(r["rigKey"])||!scope?.rigs.some(x=>x.key===r["rigKey"]&&x.rigId===r["rigId"])||!safeMapText(r["label"])||
+   typeof r["profile"]!=="string"||!MAP_KEY.test(r["profile"])||r["bank"]!==r["profile"]||typeof r["revisionSha"]!=="string"||! /^[a-f0-9]{40}$/.test(r["revisionSha"]))return bad();
+  for(const k of ["home","workspace","runtime","python"]){
+   const path=r[k];if(typeof path!=="string"||!isAbsolute(path)||normalize(path)!==path||/[\x00-\x1f\x7f]/.test(path))return bad();
+   // A virtualenv executable can be a symlink; its launch spelling selects the environment.
+   try{const resolved=canonical(path);if(!isAbsolute(resolved)||(k!=="python"&&resolved!==path))return bad();}catch{return bad();}
+  }
+  try{const u=new URL(String(r["endpoint"]));if(u.protocol!=="http:"||!["127.0.0.1","[::1]"].includes(u.hostname)||!u.port||u.username||u.password||u.search||u.hash||u.pathname!=="/")return bad();}catch{return bad();}
+  ids.add(r["id"]);rigs.add(r["rigKey"]);
+  return r as unknown as ChatBinding;
+ });
+}
+export function chatBridgeEnvironment(binding:ChatBinding):Record<string,string> {
+ return {PATH:"/usr/bin:/bin",HOME:binding.home,HERMES_HOME:binding.home,HERMES_PROFILE_NAME:binding.profile,PYTHONDONTWRITEBYTECODE:"1",PYTHONNOUSERSITE:"1",PYTHONPATH:binding.runtime};
 }

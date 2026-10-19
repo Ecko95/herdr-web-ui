@@ -1,4 +1,5 @@
-import { mapScope, motokoMapScopeFromEnv, motokoTarget, type MotokoMapScope } from "./motoko-config.ts";
+import { ChatService, connectChatBridge } from "./motoko-chat.ts";
+import { chatBindings, mapScope, motokoMapScopeFromEnv, motokoTarget, type MotokoMapScope } from "./motoko-config.ts";
 import { createRigModelReader } from "./motoko-topology.ts";
 import { createModelControl } from "./motoko-model-control.ts";
 import { createHealthSampler } from "./motoko-health.ts";
@@ -351,6 +352,8 @@ export function createServer(
   const mapReader = createRigModelReader(mapCatalog);
   const modelControl = createModelControl(mapReader);
   const mapRigKeys = new Set(mapCatalog?.rigs.map(r => r.key) ?? []);
+  const chatScope = chatBindings(motokoEnv["HERDR_WEB_MOTOKO_CHAT_BINDINGS"], mapCatalog);
+  const chat = owner && chatScope.length ? new ChatService({stateDir: options.stateDir ?? defaultStateDir(), bindings:chatScope,reader:mapReader,connect:connectChatBridge}) : null;
   const motokoProvider = options.motokoProvider ?? createOpenRigProvider(undefined, Date.now, motokoEnv);
   // Owner requests to the orchestrator: enabled only by the exact registered source (HERDR_WEB_MOTOKO_SOURCE_SESSION)
   // and its startup check; tests pass their own instance. Without owner mode there is no coordination at all.
@@ -1168,7 +1171,7 @@ export function createServer(
         return pageMediaResponse(pathname.slice(PAGE_MEDIA_PATH.length), mediaClient, Date.now(), true)
           ?? jsonResponse({ error: { code: "not_found", message: "no such page media" } }, 404);
       }
-      const ownerTouch = mutating && !pathname.startsWith("/api/motoko/map/");
+      const ownerTouch = mutating && !pathname.startsWith("/api/motoko/map/") && !pathname.startsWith("/api/motoko/chat");
       let ownerSession = owner?.match(request, ownerTouch) ?? null;
       if (!owner && (pathname.startsWith("/api/owner/") || pathname.startsWith("/api/motoko/"))) return jsonResponse({ error: { code: "owner_gate_required", message: "Owner mode is required" } }, 404);
       if (owner && (pathname.startsWith("/api/") || pathname === "/ws")) {
@@ -1184,7 +1187,7 @@ export function createServer(
       const checkOwner = (): void => {
         if (owner && ownerSession) owner.assertCurrent(ownerSession.id);
       };
-      if (owner && ownerSession && mutating && !pathname.startsWith("/api/motoko/map/") && request.headers.get("content-type")?.includes("application/json")) {
+      if (owner && ownerSession && mutating && !pathname.startsWith("/api/motoko/chat") && !pathname.startsWith("/api/motoko/map/") && request.headers.get("content-type")?.includes("application/json")) {
         const body = await request.arrayBuffer();
         if (!owner.current(ownerSession.id)) return owner.denied();
         request = new Request(request, { body });
@@ -1233,6 +1236,14 @@ export function createServer(
         return pathname === "/ws" ? new Response("unauthorized", { status: 401 }) : unauthorizedJson(access.level === "none" ? access.reason : "token_required");
       }
 
+      if (pathname === "/api/motoko/chat") {
+        const { handleChatRequest, ChatError } = await import("./motoko-chat.ts");
+        if (!owner || !ownerSession || !owner.current(ownerSession.id)) return owner?.denied() ?? new Response(null,{status:404});
+        const sessionId=ownerSession.id;
+        const context={ownerSessionId:sessionId,allowedRigKeys:mapRigKeys,signal:owner.signal(sessionId),recheck:()=>{owner.assertCurrent(sessionId);}};
+        const unavailable=async():Promise<never>=>{throw new ChatError("profile_unconfigured",409);};
+        return handleChatRequest(request,chat??{list:()=>[],open:unavailable,act:unavailable},context,owner.config.origin);
+      }
       if (pathname.startsWith("/api/motoko/map/")) {
         if (pathname.endsWith("/model")) {
           const { handleModelControlRequest } = await import("./motoko-model-control.ts");
@@ -2350,6 +2361,7 @@ export function createServer(
       stopped = true;
       if (privateManaged && privateReady) { privateReady = false; reportPrivateReadiness("failed"); }
       owner?.close();
+      chat?.close();
       settlePortalStartup({ ok: false, error: new Error("Server stopped before Portal startup cleanup completed") });
       conversations.stop();
       clearInterval(outputTimer);

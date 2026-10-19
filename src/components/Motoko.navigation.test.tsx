@@ -63,3 +63,5 @@ it("opens the map destination through the owner page",async()=>{
  expect(requests).toContainEqual({url:"/api/motoko/map/rigs",method:"GET"});
  expect(JSON.stringify(renderer!.toJSON())).toContain("Map");
 });
+
+it("opens the actual chat destination",async()=>{await open({destination:"chat"});expect(requests).toContainEqual({url:"/api/motoko/chat",method:"POST"});});

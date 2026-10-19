@@ -783,3 +783,69 @@ No personal token or automatic dispatch bypass follows from that limit.
 See [GitHub's token event rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow).
 The existing required checks still control the merge.
 The Motoko review set is conservative; it does not prove that every other path is harmless.
+
+
+## Owner chat through Hermes
+
+The Chat view uses a fixed server binding. A binding links an approved rig, workspace and Hermes profile.
+The browser selects a binding ID. It cannot select a filesystem path, endpoint, credential or gateway method.
+An absent `HERDR_WEB_MOTOKO_CHAT_BINDINGS` keeps chat unconfigured. No default profile mapping exists.
+
+The private environment value contains a JSON array. Each record requires these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | A random 32-character lowercase hexadecimal binding ID. |
+| `revision` | A positive integer. Increase it when the binding changes. |
+| `rigKey`, `rigId` | The exact key and ID from the approved map catalog. |
+| `label` | A public-safe display label. |
+| `profile`, `bank` | The canonical profile name and its private Mnemosyne bank. Both values must match. |
+| `home`, `workspace`, `runtime` | Existing absolute canonical paths. Path aliases are refused. |
+| `python` | The approved Python executable. A virtual environment can use its own executable symlink. |
+| `endpoint` | An explicit HTTP loopback endpoint with a port. |
+| `revisionSha` | The accepted runtime source revision, as 40 lowercase hexadecimal characters. |
+
+The server rejects unknown fields, duplicate mappings and rigs outside the approved map catalog.
+It reads the current rig through the existing map reader before chat access. Stale evidence refuses access.
+A changed binding cannot resume a journal record from the earlier binding.
+
+The bridge uses the installed Python gateway client. It discovers an existing ready endpoint and never starts a Hermes gateway.
+Its environment excludes inherited provider credentials, proxy values and remote gateway overrides.
+It keeps `HOME`, `HERMES_HOME`, the profile name and the approved runtime import path explicit.
+The owner runtime retains its normal credential sources. Profiles do not provide operating system isolation.
+Complete credential and host isolation require separate work.
+
+The runtime must implement `motoko-required-memory-v1`, its status handler and enforcement before inference.
+The current unmodified runtime is incompatible. A capability name alone does not prove enforcement.
+Session creation persists an immutable memory requirement. The first prompt can enter with that verified requirement.
+The runtime checks the actual initialized Mnemosyne provider before inference. A failure ends the prompt before inference.
+The status remains uninitialized until the runtime observes the actual provider. Every later turn repeats the check.
+The runtime and provider patches require separate source acceptance and deployment. This web source installs neither patch.
+
+The private `chat/identities.sqlite` journal retains conversation, creation, submission and admission identities.
+It retains unresolved input text with its digest. A terminal canonical receipt removes that text from the active record.
+Hermes retains the transcript. The journal does not store transcript history.
+The journal directory uses mode 0700. Its database and exclusive writer marker use mode 0600.
+A stale writer marker refuses access after an unclean shutdown. Trusted recovery must verify the original journal before it removes the marker.
+The server never removes a stale marker automatically.
+
+One browser writer controls each conversation. A second view can inspect the conversation but cannot control it.
+The owner can confirm an explicit writer recovery. The server checks the observed generation before the transfer.
+The transfer preserves unresolved input identities. The former writer loses control immediately.
+Each conversation permits one unresolved input. A transport failure retains its original submission ID and never triggers a new submission.
+A lost-turn acknowledgement uses the recorded admission and generation. Its confirmation explains that it does not resend the input.
+An unknown acknowledgement without a canonical admission remains unresolved.
+
+The view reads current state every two seconds. These reads do not extend the owner idle deadline.
+The bridge drains events during commands. It omits reasoning events and requires a new snapshot after a replay gap.
+The private transport caps a frame at 8 MiB. Oversized history refuses access rather than an unbounded retry.
+Each history page contains at most 100 rows and 256 KiB. Its cursor belongs to one binding and canonical snapshot.
+The server caps event frames at 64 KiB and its event backlog at 128 frames or 256 KiB.
+Overflow requires a new snapshot. It cannot establish a successful terminal outcome.
+Live tool activity shows at most sixteen approved tool names and their states.
+Unknown tool names use a generic label. Live tool activity omits raw tool arguments, results and diagnostics.
+
+Owner revocation blocks later browser reads and effects. The server retains a cancellation obligation for unresolved admissions.
+It attempts Stop for the recorded admission, then detaches its viewer. An unresolved remote outcome stays explicit.
+Viewer detach does not prove remote termination across a crash. This component provides no hard remote stop guarantee.
+No real profile, endpoint or credential belongs in public documentation, browser errors or logs.

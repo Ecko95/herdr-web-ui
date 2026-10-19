@@ -87,3 +87,16 @@ export interface MotokoHealth {
   memory: Known<{ usedBytes: number; totalBytes: number }>;
   uptime: Known<number>;
 }
+
+/** Browser chat projections omit runtime paths, tickets and raw diagnostics. */
+export interface ChatMessage {role:"user"|"assistant"|"tool";text:string}
+export interface ChatPrompt {id:string;kind:"approval"|"clarify";generation:number;text:string;choices:string[]}
+export interface ChatView {
+ conversationId:string;bindingId:string;label:string;profile:string;rigKey:string;writerGeneration:number;
+ memory:"uninitialized"|"ready"|"failed";tools:{name:string;status:"active"|"complete"}[];messages:ChatMessage[];prompts:ChatPrompt[];
+ pending:{submissionId:string;status:"queued"|"started"|"unknown";canAcknowledge:boolean}|null;outcome:string|null;
+ history:"ready"|"unavailable";hasEarlier:boolean;historyCursor:string|null;status:string;
+}
+export type ChatAction = {operation:"recover"}| {operation:"acknowledge";acknowledgeLostTurn:true}| {operation:"history";cursor:string}| {operation:"read"}|{operation:"stop"}|{operation:"release"}|{operation:"send";submissionId:string;text:string}|
+ {operation:"approve"|"clarify";promptId:string;generation:number;answer:string};
+export interface ChatBindingView {id:string;label:string;profile:string;rigKey:string}
