@@ -1,3 +1,5 @@
+import { MotokoChat } from "./MotokoChat.tsx";
+import { MotokoMap } from "./MotokoMap.tsx";
 /**
  * Motoko: the owner's view of rigs and seats, over the pane area (App.tsx, `?page=motoko`), and
  * the owner's passkeys and sessions. It reads /api/motoko/status, which the server serves only
@@ -7,15 +9,17 @@
  * past its limit says so with its age; a source that failed shows the failure and no rigs. Agent
  * text (a Needs-you summary) is shown as text, never as markup, and is not an approval.
  */
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { KeyRound, LogOut, RefreshCw, Send, X } from "lucide-react";
 
 import "./Motoko.css";
 
-import { MOTOKO_REQUEST_TEXT_MAX, occupancy, sampleAge, type Activity, type Known, type MotokoRequests, type MotokoRequestView, type MotokoSeat, type MotokoStatus } from "../../shared/motoko.ts";
+import { MOTOKO_REQUEST_TEXT_MAX, occupancy, sampleAge, type Activity, type Known, type MotokoHealth, type MotokoRequests, type MotokoRequestView, type MotokoSeat, type MotokoStatus } from "../../shared/motoko.ts";
+import type { MotokoDestination, MotokoRequest } from "../lib/actions.ts";
+import { deviceLabel } from "../lib/phone.ts";
 import { ApiError } from "../lib/api.ts";
 import { currentLocale, useT } from "../lib/i18n.ts";
-import { addPasskey, cancelCeremony, ceremonyCanceled, fetchMotokoRequests, fetchMotokoStatus, fetchOwnerSessions, ownerErrorMessage, ownerMode, revokeOwnerCredential, revokeOwnerSession, submitMotokoRequest, type OwnerAuth, type OwnerSessions } from "../lib/motoko.ts";
+import { addPasskey, cancelCeremony, ceremonyCanceled, fetchMotokoHealth, fetchMotokoRequests, fetchMotokoStatus, fetchOwnerSessions, ownerErrorMessage, ownerMode, revokeOwnerCredential, revokeOwnerSession, submitMotokoRequest, type OwnerAuth, type OwnerSessions } from "../lib/motoko.ts";
 import { MotokoBoot } from "./MotokoBoot.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
@@ -24,6 +28,7 @@ const ACTIVITY_BADGE: Record<Activity, string> = { working: "badge-working", idl
 
 export interface MotokoProps {
   auth: OwnerAuth | null;
+  request: MotokoRequest;
   onClose: () => void;
   /** the shell's own sign-out (App.tsx lock), which ends the owner session on the server */
   onSignOut: () => Promise<void>;
@@ -42,13 +47,17 @@ function useAge(): (ms: number) => string {
   };
 }
 
-export function Motoko({ auth, onClose, onSignOut, onSessionEnded }: MotokoProps) {
+export function Motoko({ auth, request, onClose, onSignOut, onSessionEnded }: MotokoProps) {
   const t = useT();
-  const [tab, setTab] = useState<"boot" | "status" | "requests" | "access">("boot");
+  const [selected, setSelected] = useState({ request, destination: request.destination });
+  // A new shortcut can focus the same destination again without remounting the access form.
+  if (selected.request !== request) setSelected({ request, destination: request.destination });
+  const tab = selected.destination === "sessions" || selected.destination === "passkey" ? "access" : selected.destination;
+  const setTab = (destination: MotokoDestination) => setSelected({ request, destination });
   const headingId = useId();
   const owner = ownerMode(auth) && auth?.authenticated === true;
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { heading.current?.focus(); }, []);
+  useLayoutEffect(() => { if (tab !== "access" || !owner) heading.current?.focus(); }, [selected, owner]);
   return (
     <section className="motoko" aria-labelledby={headingId}>
       <header className="motoko-head">
@@ -56,15 +65,64 @@ export function Motoko({ auth, onClose, onSignOut, onSessionEnded }: MotokoProps
         <div className="motoko-tabs" role="tablist" aria-label={t("Motoko views")}>
           <button type="button" role="tab" aria-selected={tab === "boot"} className="btn btn-ghost" onClick={() => setTab("boot")}>{t("Boot")}</button>
           <button type="button" role="tab" aria-selected={tab === "status"} className="btn btn-ghost" onClick={() => setTab("status")}>{t("Status")}</button>
+          <button type="button" role="tab" aria-selected={tab === "map"} className="btn btn-ghost" onClick={() => setTab("map")}>{t("Map")}</button>
+          <button type="button" role="tab" aria-selected={tab === "health"} className="btn btn-ghost" onClick={() => setTab("health")}>{t("VPS health")}</button>
+          <button type="button" role="tab" aria-selected={tab === "chat"} className="btn btn-ghost" onClick={() => setTab("chat")}>{t("Chat")}</button>
           <button type="button" role="tab" aria-selected={tab === "requests"} className="btn btn-ghost" onClick={() => setTab("requests")}>{t("Requests")}</button>
-          <button type="button" role="tab" aria-selected={tab === "access"} className="btn btn-ghost" onClick={() => setTab("access")}>{t("Access")}</button>
+          <button type="button" role="tab" aria-selected={tab === "access"} className="btn btn-ghost" onClick={() => setTab("sessions")}>{t("Access")}</button>
         </div>
         <button type="button" className="icon-button" aria-label={t("Close Motoko")} onClick={onClose}><X /></button>
       </header>
       {!owner
         ? <p className="motoko-note" role="status">{t("Motoko needs owner passkey sign-in on this server. It shows nothing without it.")}</p>
-        : tab === "boot" ? <MotokoBoot onStatus={() => setTab("status")} onSessionEnded={onSessionEnded} /> : tab === "status" ? <StatusView onSessionEnded={onSessionEnded} /> : tab === "requests" ? <RequestsView onSessionEnded={onSessionEnded} /> : <AccessView onSignOut={onSignOut} onSessionEnded={onSessionEnded} />}
+        : tab === "boot" ? <MotokoBoot onStatus={() => setTab("status")} onSessionEnded={onSessionEnded} /> : tab === "status" ? <StatusView onSessionEnded={onSessionEnded} /> : tab === "map" ? <MotokoMap onSessionEnded={onSessionEnded} /> : tab === "health" ? <HealthView onSessionEnded={onSessionEnded} /> : tab === "chat" ? <MotokoChat onSessionEnded={onSessionEnded} /> : tab === "requests" ? <RequestsView onSessionEnded={onSessionEnded} /> : <AccessView request={selected} onSignOut={onSignOut} onSessionEnded={onSessionEnded} />}
     </section>
+  );
+}
+
+function HealthView({ onSessionEnded }: { onSessionEnded: () => void }) {
+  const t = useT();
+  const age = useAge();
+  const sessionEnded = useRef(onSessionEnded);
+  useLayoutEffect(() => { sessionEnded.current = onSessionEnded; }, [onSessionEnded]);
+  const [health, setHealth] = useState<MotokoHealth | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    let closed = false, busy = false;
+    let controller: AbortController | null = null;
+    const load = async () => {
+      if (closed || busy || document.visibilityState !== "visible") return;
+      busy = true; controller = new AbortController();
+      try {
+        const next = await fetchMotokoHealth(controller.signal);
+        if (!closed) { setHealth(next); setError(null); }
+      } catch (failure) {
+        if (closed) return;
+        if (failure instanceof ApiError && failure.status === 401) { sessionEnded.current(); return; }
+        setError(ownerErrorMessage(failure));
+      } finally { busy = false; if (!closed) setNow(Date.now()); }
+    };
+    const refresh = () => { setNow(Date.now()); void load(); };
+    void load();
+    const timer = window.setInterval(refresh, 5_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { closed = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); controller?.abort(); };
+  }, []);
+  if (health === null) return <p className={error ? "motoko-banner is-error" : "motoko-note"} role={error ? "alert" : "status"}>{error ?? t("Health sample pending.")}</p>;
+  const { ageMs, stale } = sampleAge(health, now);
+  return (
+    <div className="motoko-body">
+      <p className="motoko-banner">{t("VPS health: the server that hosts this app. Remote PCs and rigs are not included.")}</p>
+      {error && <p className="motoko-banner is-error" role="alert">{t("The last refresh failed: {error}", { error })}</p>}
+      {stale && <p className="motoko-banner is-stale" role="status">{t("This sample is stale: taken {age}. Values below may no longer hold.", { age: age(ageMs) })}</p>}
+      <p className="motoko-sample">{t("Sampled {age}", { age: age(ageMs) })}</p>
+      <dl className="motoko-facts">
+        <div><dt>{t("CPU utilization")}</dt><dd>{health.cpu.state === "known" ? t("{percent}% over {ms} ms", { percent: health.cpu.value.percent.toFixed(1), ms: Math.round(health.cpu.value.intervalMs) }) : t("Unknown")}</dd></div>
+        <div><dt>{t("Memory use (includes caches)")}</dt><dd>{health.memory.state === "known" ? t("{used} of {total} bytes", { used: health.memory.value.usedBytes.toLocaleString(currentLocale()), total: health.memory.value.totalBytes.toLocaleString(currentLocale()) }) : t("Unknown")}</dd></div>
+        <div><dt>{t("Server uptime")}</dt><dd>{health.uptime.state === "known" ? t("{seconds} seconds", { seconds: Math.floor(health.uptime.value).toLocaleString(currentLocale()) }) : t("Unknown")}</dd></div>
+      </dl>
+    </div>
   );
 }
 
@@ -280,7 +338,7 @@ function RequestRow({ item, sending, onRetry }: { item: MotokoRequestView; sendi
   );
 }
 
-function AccessView({ onSignOut, onSessionEnded }: { onSignOut: () => Promise<void>; onSessionEnded: () => void }) {
+function AccessView({ request, onSignOut, onSessionEnded }: { request: MotokoRequest; onSignOut: () => Promise<void>; onSessionEnded: () => void }) {
   const t = useT();
   const [data, setData] = useState<OwnerSessions | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -290,6 +348,12 @@ function AccessView({ onSignOut, onSessionEnded }: { onSignOut: () => Promise<vo
   const labelRef = useRef<HTMLInputElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
   const listHeading = useRef<HTMLHeadingElement>(null);
+  const sessionsHeading = useRef<HTMLHeadingElement>(null);
+  useLayoutEffect(() => {
+    const target = request.destination === "passkey" ? labelRef.current : sessionsHeading.current;
+    target?.focus();
+    target?.scrollIntoView({ block: "nearest" });
+  }, [request]);
   // the Add button takes the focus back once it is enabled again
   const refocus = useRef(false);
   useEffect(() => { if (!adding && refocus.current) { refocus.current = false; addRef.current?.focus(); } }, [adding]);
@@ -353,10 +417,10 @@ function AccessView({ onSignOut, onSessionEnded }: { onSignOut: () => Promise<vo
         <button ref={addRef} type="submit" className="btn btn-primary" disabled={adding}><KeyRound size={14} aria-hidden="true" /> {t(adding ? "Waiting for passkeys…" : "Add a passkey")}</button>
         <p className="motoko-hint">{t("One of your passkeys signs first, then the new one registers and proves itself.")}</p>
       </form>
-      <h2 className="motoko-subtitle">{t("Sessions")}</h2>
+      <h2 ref={sessionsHeading} tabIndex={-1} className="motoko-subtitle">{t("Sessions")}</h2>
       <p className="motoko-hint">{t("A browser cannot report a device's MAC address. These are the address and browser the server saw.")}</p>
       <ul className="motoko-list">{data?.sessions.map((session) => {
-        const name = session.user_agent ?? t("unknown browser");
+        const name = session.user_agent ? deviceLabel(session.user_agent) : t("unknown browser");
         return (
           <li key={session.id} className="motoko-card">
             <span className="motoko-card-title">{name}{session.current ? ` · ${t("this browser")}` : ""}</span>

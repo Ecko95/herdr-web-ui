@@ -1,0 +1,41 @@
+name: Upstream update
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: upstream-main-update
+  cancel-in-progress: false
+jobs:
+  update:
+    if: github.repository == 'Ecko95/herdr-web-ui' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      # The trusted checkout stays on main; candidate files use a separate temporary worktree.
+      - name: Prepare the update PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/upstream-sync.ts
+      - name: Preserve the complete update report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/upstream-sync-report.md
+          if-no-files-found: ignore

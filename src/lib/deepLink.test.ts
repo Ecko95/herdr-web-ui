@@ -160,3 +160,17 @@ describe("the Motoko page", () => {
     expect(linkSearch({ ...readLink("?page=motoko"), page: null }, "?page=motoko")).toBe("");
   });
 });
+
+
+describe("Motoko history", () => {
+  it("keeps entry and exit even without a pane", () => {
+    for (const pane of [null, "a"]) {
+      const workspace = { machine: "local", pane, page: null };
+      const motoko = { ...workspace, page: "motoko" as const };
+      expect(isNavigation(workspace, motoko)).toBe(true);
+      expect(isNavigation(motoko, workspace)).toBe(true);
+      expect(isNavigation(motoko, { ...motoko })).toBe(false);
+      expect(readLink(linkSearch({ ...motoko, workspace: null, view: null, settings: null })).page).toBe("motoko");
+    }
+  });
+});

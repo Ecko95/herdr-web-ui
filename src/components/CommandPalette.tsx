@@ -1,6 +1,6 @@
 import { MachineContext, useMachineApi, useMachineId } from "../lib/machineContext.tsx";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { Bell, Columns2, CornerLeftUp, Folder, FolderOpen, FolderSearch, History, LoaderCircle, Maximize2, MessageSquarePlus, Minimize2, Monitor, PanelLeft, Pin, Plus, Puzzle, RefreshCw, Rows2, Settings, SunMoon, SwitchCamera, X } from "lucide-react";
+import { Bell, Columns2, CornerLeftUp, Folder, FolderOpen, FolderSearch, History, LoaderCircle, Maximize2, MessageSquarePlus, Minimize2, Monitor, PanelLeft, Pin, Plus, Puzzle, RefreshCw, Rows2, Settings, ShieldCheck, SunMoon, SwitchCamera, X } from "lucide-react";
 
 import "./CommandPalette.css";
 
@@ -11,7 +11,7 @@ import { paneStatus, STATUS_WORD } from "../lib/status.ts";
 import { zoomMode } from "../lib/layoutMap.ts";
 import type { AppActions, PaneView } from "../lib/actions.ts";
 import { FILTER_KEYS, offeredPluginActions, parseQuery, STATUS_FILTERS, statusCounts, type OfferedPluginAction, type PaletteStatusFilter } from "../lib/paletteSearch.ts";
-import { actionAliases, rankByTitle, requestSettingsPage, settingsPageEntries } from "../lib/paletteSettings.ts";
+import { actionAliases, motokoEntries, rankByTitle, requestSettingsPage, settingsPageEntries } from "../lib/paletteSettings.ts";
 import { Ownership, runPluginActionToEnd } from "../lib/pluginRun.ts";
 import { shortcutDisplayKeys, formatKeys, type ShortcutId } from "../lib/shortcuts.ts";
 import { useSettings } from "../lib/settings.ts";
@@ -59,6 +59,7 @@ interface PaletteAction {
   shortcut?: ShortcutId;
   /** the palette stays open after it: it changes the palette's own list */
   keepOpen?: boolean;
+  navigates?: boolean;
   run: () => void;
 }
 
@@ -297,6 +298,7 @@ export function CommandPalette({ open, initialQuery = "", onClose, machines, onS
   const browseStart = selectedPane && panePath(selectedPane) ? panePath(selectedPane) : null;
 
   const paletteActions = useMemo<PaletteAction[]>(() => [
+    ...motokoEntries(t, actions.openMotoko).map((entry) => ({ ...entry, icon: ShieldCheck, navigates: true })),
     { id: "new", label: t("New workspace"), icon: MessageSquarePlus, shortcut: "new-session", run: actions.openNewSession },
     // in the selected pane's workspace: nothing to add a tab to without one
     ...(selectedPaneId !== null ? [{ id: "new-tab", label: t("New tab"), icon: Plus, shortcut: "new-tab", run: () => actions.openNewTab() }] satisfies PaletteAction[] : []),
@@ -461,6 +463,7 @@ export function CommandPalette({ open, initialQuery = "", onClose, machines, onS
     onClose();
   };
   const runAction = (action: PaletteAction): void => {
+    if (action.navigates) navigated.current = true;
     action.run();
     if (!action.keepOpen) onClose();
   };

@@ -1,3 +1,5 @@
+import type { RigCatalog, RigMapModel, RigDraftRequest, RigDraftResult } from "../../shared/motoko-topology.ts";
+import type { ModelSaveInput, ModelSaveResult } from "../../shared/motoko-model-control.ts";
 /**
  * The browser's side of Motoko: the status read and the owner's passkey ceremonies against
  * /api/owner/* (server/motoko-owner.ts). The ceremonies are the browser's own WebAuthn prompts,
@@ -10,7 +12,7 @@
  */
 import { startAuthentication, startRegistration, WebAuthnAbortService, type PublicKeyCredentialCreationOptionsJSON, type PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
 import type { AccessRefusal, HealthAuth } from "../../shared/protocol.ts";
-import type { MotokoRequestInput, MotokoRequests, MotokoRequestView, MotokoStatus, OwnerHealth, OwnerRefusal } from "../../shared/motoko.ts";
+import type { MotokoHealth, MotokoRequestInput, MotokoRequests, MotokoRequestView, MotokoStatus, OwnerHealth, OwnerRefusal } from "../../shared/motoko.ts";
 import { ApiError } from "./api.ts";
 import { t } from "./i18n.ts";
 
@@ -32,7 +34,7 @@ export function ownerMode(auth: OwnerAuth | null): boolean {
 async function request<T>(url: string, method: "GET" | "POST" | "DELETE" = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, method === "GET"
     ? { cache: "no-store", signal }
-    : { method, headers: { "content-type": "application/json", "x-herdr-machine": "1" }, body: JSON.stringify(body ?? {}) });
+    : { method, signal, headers: { "content-type": "application/json", "x-herdr-machine": "1" }, body: JSON.stringify(body ?? {}) });
   if (!response.ok) {
     let detail = response.statusText;
     let code: string | null = null;
@@ -47,6 +49,7 @@ async function request<T>(url: string, method: "GET" | "POST" | "DELETE" = "GET"
   return (answer === "" ? undefined : JSON.parse(answer)) as T;
 }
 
+export const fetchMotokoHealth = (signal?: AbortSignal): Promise<MotokoHealth> => request("/api/motoko/health", "GET", undefined, signal);
 export const fetchMotokoStatus = (signal?: AbortSignal): Promise<MotokoStatus> => request("/api/motoko/status", "GET", undefined, signal);
 /** One request to the orchestrator: the caller keeps the requestId so a retry it chooses reuses it; nothing retries here. */
 export const submitMotokoRequest = (input: MotokoRequestInput): Promise<MotokoRequestView> => request("/api/motoko/requests", "POST", { requestId: input.requestId, text: input.text });
@@ -115,6 +118,7 @@ export function ownerErrorMessage(error: unknown): string {
       case "enrollment_required": return t("That enrollment token is wrong, used or expired. Create a new one over SSH.");
       case "enrollment_closed": return t("A passkey is already enrolled. Sign in with it instead.");
       case "too_many_attempts": return t("Too many wrong tries. Wait a moment, then try again.");
+      case "owner_session_limit": return t("Three active logins already exist. Revoke an old login from a device that is signed in.");
       case "last_credential": return t("You cannot revoke your last passkey here. Use the SSH recovery steps.");
       case "disabled_in_owner_mode": return t("Owner sign-in turns this off.");
       case "coordination_origin_unbound": return t("Requests are not connected on this server. Nothing was sent.");
@@ -134,3 +138,13 @@ export function ownerErrorMessage(error: unknown): string {
   }
   return String(error);
 }
+
+export const fetchRigCatalog = (signal?:AbortSignal):Promise<RigCatalog> => request("/api/motoko/map/rigs","GET",undefined,signal);
+export const fetchRigModel = (key:string,signal?:AbortSignal):Promise<RigMapModel> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}`,"GET",undefined,signal);
+export const validateRigDraft = (key:string,input:RigDraftRequest,signal?:AbortSignal):Promise<RigDraftResult> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}/validate`,"POST",input,signal);
+export const saveSeatModel = (key:string,input:ModelSaveInput):Promise<ModelSaveResult> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}/model`,"POST",input);
+
+/** Chat calls never retry a send after an unknown transport result. */
+export const listChatBindings=(signal?:AbortSignal):Promise<{bindings:import("../../shared/motoko.ts").ChatBindingView[]}>=>request("/api/motoko/chat","POST",{operation:"list"},signal);
+export const openChat=(bindingId:string,writerId:string,signal?:AbortSignal):Promise<import("../../shared/motoko.ts").ChatView>=>request("/api/motoko/chat","POST",{operation:"open",bindingId,writerId},signal);
+export const actChat=(view:import("../../shared/motoko.ts").ChatView,writerId:string,action:import("../../shared/motoko.ts").ChatAction,signal?:AbortSignal):Promise<import("../../shared/motoko.ts").ChatView>=>request("/api/motoko/chat","POST",{conversationId:view.conversationId,writerGeneration:view.writerGeneration,writerId,...action},signal);

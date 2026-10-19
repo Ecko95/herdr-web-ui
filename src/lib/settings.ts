@@ -1,3 +1,5 @@
+import type { MapPreferences } from "../../shared/motoko-topology.ts";
+import { sanitizeMapPreferences } from "../../shared/motoko-topology.ts";
 /**
  * User preferences: one localStorage record, one React context, applied to the
  * document as `data-theme` / `data-density` / `data-chat-width` attributes that src/styles.css keys
@@ -62,6 +64,7 @@ import { FILE_OPEN_TARGETS, type FilePresentation } from "./filePresentation.ts"
 import { CLAUDE_LAUNCH_MODES, CODEX_LAUNCH_MODES, type ClaudeLaunchMode, type CodexLaunchMode } from "./agentLaunchMode.ts";
 
 export interface Settings {
+  motokoMap: MapPreferences;
   terminalInputMode: "auto" | "line" | "direct";
   /** Kept for migration of the old fixed-order bar. New layouts use keyBarItems. */
   keyBarExtras: KeyBarExtra[];
@@ -179,7 +182,7 @@ export type DiffStyle = (typeof DIFF_STYLES)[number];
  * fileOpen, webLinks and the launch modes are not collected: the telemetry schema (shared/telemetry.ts) does not carry them. */
 type TelemetrySourceSettings = Omit<Settings,
   "keyBarExtras" | "keyBarItems" | "shortcutOverrides" | "terminalFontFamily" | "chatFontFamily"
-  | "quickReplies" | "usageOrder" | "usageHidden" | "fileOpen" | "webLinks" | "claudeLaunchMode" | "codexLaunchMode">;
+  | "motokoMap" | "quickReplies" | "usageOrder" | "usageHidden" | "fileOpen" | "webLinks" | "claudeLaunchMode" | "codexLaunchMode">;
 
 /** Compare structured custom settings by content against this app's built-in defaults. */
 function differsFromDefault(value: unknown, defaultValue: unknown): boolean {
@@ -249,6 +252,7 @@ export function telemetrySettingsSnapshot(settings: Settings): TelemetrySettings
  * must be placed here, or the build fails; when in doubt it is the device's.
  */
 export const SETTING_SCOPE = {
+  motokoMap: "device",
   theme: "shared", palette: "shared", darkTheme: "shared", lightTheme: "shared", language: "shared", sidebarRows: "shared", agentOrder: "shared",
   agentMarks: "shared", autoSendQueued: "shared", showThinking: "shared", quickReplies: "shared",
   showQuickReplies: "shared", showUsage: "shared", usageCount: "shared",
@@ -272,6 +276,7 @@ export function sharedSettings(settings: Settings): Partial<Record<SharedSetting
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  motokoMap: { rigKey: null, mode: "map", zoom: 1, podFilter: null },
   terminalInputMode: "auto",
   keyBarExtras: ["alt"],
   keyBarItems: DEFAULT_KEY_BAR_ITEMS,
@@ -451,6 +456,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     ? migrateKeyBarItems(keyBarExtras)
     : DEFAULT_KEY_BAR_ITEMS;
   return {
+    motokoMap: sanitizeMapPreferences(record["motokoMap"]),
     terminalInputMode: record["terminalInputMode"] === "line" || record["terminalInputMode"] === "direct" ? record["terminalInputMode"] : "auto",
     keyBarExtras,
     keyBarItems: sanitizeKeyBarItems(record["keyBarItems"], keyBarFallback),

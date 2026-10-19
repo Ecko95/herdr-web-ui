@@ -11,6 +11,7 @@ import { PaneTerminal } from "./components/PaneTerminal.tsx";
 import { PANE_TABPANEL_ID, paneTabPanelLabel } from "./lib/paneRegion.ts";
 import { worktreeRepoName } from "./lib/composerStrip.ts";
 import { AccessGate } from "./components/AccessGate.tsx";
+import { useMotokoNavigation } from "./lib/useMotokoNavigation.ts";
 import { Motoko } from "./components/Motoko.tsx";
 import { ownerMode, ownerSignOut, type GateReason, type OwnerAuth } from "./lib/motoko.ts";
 import { AgentMark } from "./components/AgentMark.tsx";
@@ -280,7 +281,8 @@ export function App() {
   // a token a proxy sends with every request comes back right after signing out: signing out is the proxy's
   const canSignOut = auth?.authenticated === true && (auth.via === "device" || (auth.via === "token" && auth.bearer !== true) || ownerMode(auth));
   // Motoko over the pane area (`?page=motoko`): only where the server runs the owner gate
-  const [motokoOpen, setMotokoOpen] = useState(() => initialLink?.page === "motoko");
+  const { request: motokoRequest, open: openMotoko, close: closeMotoko, restore: restoreMotoko } = useMotokoNavigation(auth, initialLink?.page === "motoko");
+  const motokoOpen = motokoRequest !== null;
   // a device that is in only because nothing is paired yet still pairs from the QR code's address
   const pairedFromAddress = useRef(false);
   useEffect(() => {
@@ -822,6 +824,7 @@ export function App() {
   const selectedMachineRef = useRef(selectedMachineId);
   selectedMachineRef.current = selectedMachineId;
   const selectTarget = useCallback((machineId: string, paneId: string | null, view?: PaneView) => {
+    closeMotoko();
     // Only another PC mounts a new terminal (and socket), which reports its own state. A pane
     // on the same PC keeps the connected socket, which never reports again: resetting here
     // left the header on "reconnecting" after every pane switch.
@@ -913,6 +916,7 @@ export function App() {
   }, [selectedMachineId, selectedPaneId]);
 
   const selectPane = useCallback((paneId: string, focusInput = true) => {
+    closeMotoko();
     pendingLink.current = null; pendingFile.current = null; setLinkLanded(true);
     selectionHint.current = null;
     setSelectedPaneId(paneId);
@@ -1087,6 +1091,7 @@ export function App() {
     applySplit(null, split.other);
   };
   const selectInSlot = (slot: SplitSlot, machineId: string, paneId: string, focusInput = true): void => {
+    closeMotoko();
     const open = splitRef.current;
     if (!open || !splitOn || open.active === slot) { selectPane(paneId, focusInput); return; }
     if (selectedPaneId === null) return;
@@ -1211,7 +1216,7 @@ export function App() {
     // Back and Forward land where the address already says: nothing to write
     if (search === window.location.search) return;
     const url = `${window.location.pathname}${search}${window.location.hash}`;
-    if (previous !== null && !popped && !autoSelected && !settingsOpen && !newSessionOpen && isNavigation(previous, link)) {
+    if (previous !== null && !popped && (!autoSelected || previous.page !== link.page) && !settingsOpen && !newSessionOpen && isNavigation(previous, link)) {
       // a move that leaves the open file behind takes the file's entry: no entry is left between
       if (fileLeft) window.history.replaceState({ [NAV_KEY]: true }, "", url);
       else window.history.pushState({ [NAV_KEY]: true }, "", url);
@@ -1239,11 +1244,15 @@ export function App() {
       // worktree's shell, before the roster lists it) is written over the address once it is listed
       if (sheetSteppedOff()) return;
       const link = readLink(window.location.search);
+      restoreMotoko(link.page);
+      if ((writtenLink.current?.page ?? null) !== (link.page ?? null)) poppedTo.current = true;
+      setAutoSelected(false);
       // before the PCs are in, nothing can say the entry's PC is still set up: it waits as a link
       // opened with the page does, settled against its roster or answered with a note once they are
       if (machinesRef.current.length === 0) {
         if (!link.pane && !link.workspace) return;
         selectTargetRef.current(link.machine, link.pane, link.view ?? undefined);
+        restoreMotoko(link.page);
         pendingLink.current = link; pendingFile.current = null; setLinkLanded(false);
         linkSince.current = rosterSeq.current;
         poppedTo.current = true;
@@ -1263,12 +1272,12 @@ export function App() {
         const current = selectionRef.current;
         // the entry's lens is drawn over the pane's own, as a tapped notification's is. Where it
         // lands is written over the entry, so Forward keeps the entries after it
-        if (current.machineId !== link.machine || current.paneId !== pane) { poppedTo.current = true; selectTargetRef.current(link.machine, pane, link.pane === pane ? link.view ?? undefined : undefined); return; }
+        if (current.machineId !== link.machine || current.paneId !== pane) { poppedTo.current = true; selectTargetRef.current(link.machine, pane, link.pane === pane ? link.view ?? undefined : undefined); restoreMotoko(link.page); return; }
       }
       // the same pane, or no PC to go to: the entry landed on may still say what is no longer shown
       // (the address a link to Settings opened the page with, under the dialog's own entries), so it says it now
       const shown = writtenLink.current;
-      const search = shown ? linkSearch(shown, window.location.search) : window.location.search;
+      const search = shown ? linkSearch({ ...shown, page: link.page }, window.location.search) : window.location.search;
       if (search !== window.location.search) window.history.replaceState(window.history.state, "", `${window.location.pathname}${search}${window.location.hash}`);
     };
     window.addEventListener("popstate", onPop);
@@ -1333,6 +1342,7 @@ export function App() {
   const actions = useMemo<AppActions>(
     () => ({
       selectPane,
+      openMotoko: openMotoko ? (destination) => { setDrawerOpen(false); setAutoSelected(false); openMotoko(destination); } : null,
       selectAdjacentPane: (direction) => {
         // the panes the sidebar lists: a step never lands on a viewer it leaves out
         const panes = rosterPanes(snapshotRef.current?.panes ?? [], selectedPaneId);
@@ -1419,7 +1429,7 @@ export function App() {
         void zoomPane(paneId, mode, machineId).then(() => void load()).catch((err) => layoutRefused("pane zoom failed", err));
       } : null,
     }),
-    [selectPane, selectedPaneId, selectedMachineId, setView, view, updateSettings, resolvedTheme, canSignOut, lock, bellVisible, bell.run, enableNotifications, load, layoutRefused, lenses],
+    [selectPane, openMotoko, selectedPaneId, selectedMachineId, setView, view, updateSettings, resolvedTheme, canSignOut, lock, bellVisible, bell.run, enableNotifications, load, layoutRefused, lenses],
   );
 
   useShortcuts(actions, locked === false);
@@ -1476,7 +1486,7 @@ export function App() {
     ...(selectedPane && !wideScreen ? [{ id: "files", label: t("Browse files"), icon: FolderOpen, run: () => setFilesOpen(true) }] : []),
     // the address says where the app is (lib/deepLink.ts); a phone has no address bar to copy it from
     { id: "copy-link", label: t("Copy link"), icon: Link, run: () => void copyText(window.location.href).then((ok) => { if (ok) setHeaderNote("copied"); }) },
-    ...(ownerMode(auth) && auth?.authenticated ? [{ id: "motoko", label: "Motoko", icon: ShieldCheck, run: () => { setDrawerOpen(false); setMotokoOpen(true); } }] : []),
+    ...(actions.openMotoko ? [{ id: "motoko", label: "Motoko", icon: ShieldCheck, run: () => actions.openMotoko?.("boot") }] : []),
     ...(bellVisible ? [{ id: "alerts", label: t("Alerts"), hint: bell.state, checked: bell.on, title: bell.title, icon: Bell, run: () => void bell.run() }] : []),
   ];
 
@@ -1636,7 +1646,7 @@ export function App() {
           {/* a sidebar that cannot be drawn leaves the panes working */}
           <RenderBoundary resetKey={null} fallback={(retry) => <RegionCrash message={t("The sidebar can't be shown.")} retry={retry} />}>
             <CrashProbe region="sidebar" />
-            <MachineSidebar machines={machines} selectedMachineId={selectedMachineId} selectedPaneId={selectedPaneId} actions={actions} onSelect={selectTarget} onSetup={(machine, update = false) => { setUpdateRemote(update); setMachineDialog(machine); }} onNew={(id) => { setNewSessionMachineId(id); setNewTab(null); setNewSessionOpen(true); setDrawerOpen(false); }} />
+            <MachineSidebar motokoOpen={motokoOpen} machines={machines} selectedMachineId={selectedMachineId} selectedPaneId={selectedPaneId} actions={actions} onSelect={selectTarget} onSetup={(machine, update = false) => { setUpdateRemote(update); setMachineDialog(machine); }} onNew={(id) => { setNewSessionMachineId(id); setNewTab(null); setNewSessionOpen(true); setDrawerOpen(false); }} />
           </RenderBoundary>
           <SidebarResizer width={sidebarWidth} onResize={setSidebarWidth} />
         </aside>
@@ -1702,6 +1712,7 @@ export function App() {
               <MachineContext.Provider key={slot} value={machineId}><SlotSessions slot={slot} machineIds={machines.map((item) => item.id)}><PaneFollowContext.Provider value={sameTabs && !active}>
               <div
                 className={`pane-slot${showsChat(pane, slotView) ? " is-chat" : ""}${splitOn ? active ? " is-active" : " is-inactive" : ""}`}
+                inert={motokoOpen}
                 data-slot={slot}
                 data-side={splitOn ? slotSide(split, slot) : undefined}
                 // a press or the focus in the other half makes it the active one, before the press acts;
@@ -1782,7 +1793,7 @@ export function App() {
           })}
           <SplitDropPreview visible={splitDragOn && (paneDragging || tabDrag !== null)} side={dropAt} />
           {/* last, so it is drawn over the panes, which stay mounted under it */}
-          {motokoOpen && <Motoko auth={auth} onClose={() => setMotokoOpen(false)} onSignOut={lock} onSessionEnded={() => void loadHealth()} />}
+          {motokoRequest && <Motoko request={motokoRequest} auth={auth} onClose={closeMotoko} onSignOut={lock} onSessionEnded={() => void loadHealth()} />}
         </div>
         </div>
         </WebPanelContext.Provider>

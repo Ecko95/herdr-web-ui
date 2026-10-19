@@ -179,9 +179,9 @@ export function resolveLink(snapshot: Pick<SessionSnapshot, "workspaces" | "pane
   return { pane: null, workspace: null, note: link.pane || link.workspace ? "workspace-closed" : null };
 }
 
-/** Whether going from one place to another is a move the history keeps (another pane or PC). */
-export function isNavigation(from: Pick<AppLink, "machine" | "pane">, to: Pick<AppLink, "machine" | "pane">): boolean {
-  return to.pane !== null && (from.machine !== to.machine || from.pane !== to.pane);
+/** Whether going from one place to another is a move the history keeps (another pane, PC, or page). */
+export function isNavigation(from: Pick<AppLink, "machine" | "pane" | "page">, to: Pick<AppLink, "machine" | "pane" | "page">): boolean {
+  return (from.page ?? null) !== (to.page ?? null) || (to.pane !== null && (from.machine !== to.machine || from.pane !== to.pane));
 }
 
 /** Marks an entry the app pushed for a move between panes. */

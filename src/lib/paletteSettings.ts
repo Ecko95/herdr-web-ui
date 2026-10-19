@@ -1,3 +1,4 @@
+import type { AppActions } from "./actions.ts";
 import type { Translate } from "./i18n.ts";
 
 export type SettingsPageId = "appearance" | "chat" | "terminal" | "alerts" | "voice" | "usage" | "shortcuts" | "devices" | "remote" | "integrations" | "about";
@@ -30,9 +31,31 @@ export function settingsPageEntries(t: Translate): SettingsPageEntry[] {
   ];
 }
 
+/** All Motoko shortcuts use the same owner capability as the sidebar. */
+export function motokoEntries(t: Translate, open: AppActions["openMotoko"]) {
+  return open ? [
+    { id: "motoko", label: "Motoko", run: () => open("boot") },
+    { id: "motoko-status", label: t("Motoko status"), run: () => open("status") },
+    { id: "motoko-map", label: t("Rig map"), run: () => open("map") },
+    { id: "motoko-chat", label: t("Chat"), run: () => open("chat") },
+    { id: "motoko-health", label: t("VPS health"), run: () => open("health") },
+    { id: "motoko-requests", label: t("Motoko requests"), run: () => open("requests") },
+    { id: "motoko-sessions", label: t("Active logins"), run: () => open("sessions") },
+    { id: "motoko-passkey", label: t("Add a passkey"), run: () => open("passkey") },
+  ] : [];
+}
+
 /** Other words for the palette's actions, by action id: a name the user may remember instead of the label. */
 export function actionAliases(t: Translate): Readonly<Record<string, string>> {
   return {
+    motoko: t("owner workspace rigs seats"),
+    "motoko-status": t("motoko rig seat status activity context"),
+    "motoko-chat": t("chat hermes conversation messages memory"),
+    "motoko-map": t("map topology relationships teams projects rigs configuration"),
+    "motoko-health": t("cpu vps memory uptime health"),
+    "motoko-requests": t("motoko requests queue results"),
+    "motoko-sessions": t("security devices sessions active logins"),
+    "motoko-passkey": t("security credentials passkeys add key"),
     new: t("create workspace session start"),
     "new-tab": t("create tab add"),
     "split-right": t("divide pane layout side"),

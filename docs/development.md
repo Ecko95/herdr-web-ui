@@ -680,7 +680,7 @@ input regression matrix.
 
 ## Motoko private configuration
 
-Motoko reads one fixed rig from private startup configuration. The plugin reads its existing `env` or `.env` file in its configuration directory.
+Motoko reads its status and request target from private startup configuration. The plugin reads its existing `env` or `.env` file in its configuration directory.
 Set these three values in that private file before server startup. The following values are fictional examples.
 
 ```dotenv
@@ -699,3 +699,178 @@ The server never uses fixture data as a fallback. A configuration change require
 Saved receipts retain their original rig ID, source, and destination. A scope mismatch refuses all queue access and leaves stored bytes unchanged.
 Older receipts without a rig ID also refuse queue access. This change does not migrate or replace those receipts.
 Keep actual deployment values out of source files, browser configuration, and public diagnostics.
+
+### Map catalog at startup
+
+The optional `HERDR_WEB_MOTOKO_MAP_SCOPE` variable contains a JSON catalog for the owner map.
+JSON is a text format for structured data. Set this variable in the same private startup environment.
+The server accepts at most 65,536 UTF-8 bytes before it parses JSON. UTF-8 encodes text as bytes.
+The server uses the existing `mapScope` validator. Explicit invalid input stops startup with `invalid_map_scope`.
+Empty input, invalid JSON, duplicate identities, and unknown mapping keys also stop startup.
+An absent variable retains the existing one-rig fallback from the three target values above.
+This catalog does not change the status target, request target, owner configuration, or state paths.
+
+This single-line example uses fictional rigs:
+
+```dotenv
+HERDR_WEB_MOTOKO_MAP_SCOPE='{"rigs":[{"key":"alpha","rigId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","rigName":"fiction-alpha","label":"Alpha","ownerProfileKey":null,"projectKey":null},{"key":"beta","rigId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","rigName":"fiction-beta","label":"Beta","ownerProfileKey":null,"projectKey":null}],"ownerProfiles":[],"projects":[]}'
+```
+
+- The catalog contains 1 to 32 rigs. Each rig has a unique key, ID, and name.
+- Each mapping list contains at most 32 entries with unique keys and display labels.
+- A non-null `ownerProfileKey` or `projectKey` must match a key in its mapping list.
+
+Keep unknown profile and project assignments as `null`. The server does not infer assignments from rig names.
+The catalog permits reads through the fixed local OpenRig connection. It does not discover hosts or accept URLs or file paths.
+Only the owner can read the map. A configuration change requires a server restart.
+Keep actual rig identities and mappings in private deployment configuration.
+
+## Fork upstream updates
+
+The `Upstream update` workflow prepares PRs from `devswha/herdr-web-ui` main into `Ecko95/herdr-web-ui` main.
+A PR is a request to review changes before a merge.
+The schedule runs at minute 17 every six hours in UTC.
+Use **Actions → Upstream update → Run workflow** on main for a manual request.
+The workflow must exist on the default branch before either event can use it.
+GitHub can delay or drop scheduled runs under high load.
+GitHub disables public repository schedules after 60 days without repository activity.
+A fork must enable Actions before workflows can run.
+See [GitHub's event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+
+The owner must permit Actions to create PRs in the repository settings before this workflow can create its first PR.
+The built-in `GITHUB_TOKEN` needs `contents: write` and `pull-requests: write` for this workflow.
+The workflow also reads checks and commit statuses.
+It needs no personal token, repository secret, or external service.
+A denied request stops the workflow without a credential fallback.
+See [GitHub's PR creation setting](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests).
+
+The workflow keeps one open update PR for main.
+Its branch starts with `automation/upstream-main-`.
+Each later update starts from that PR's current head and merges both fork main and upstream main.
+The workflow preserves human commits and uses ordinary pushes.
+It never force-pushes, auto-merges main, creates a release tag, or dispatches a release.
+A concurrent branch update causes a refusal; a fresh manual run can use the new head.
+A closed, unmerged update PR suppresses automatic recreation for that same upstream revision.
+A new upstream revision permits a new request.
+
+A source conflict produces a draft PR with `.github/upstream-sync-conflicts.json`.
+That report-only draft contains incomplete source integration and must not merge.
+Fast checks refuses the conflict report.
+The PR body names the exact conflict phase and paths.
+
+1. Fetch the update PR branch into a separate development checkout.
+2. Merge current fork main into that branch.
+3. Resolve any source conflicts in that merge.
+4. Merge upstream main into that branch.
+5. Resolve any source conflicts in that merge.
+6. Push an ordinary commit to the same PR branch.
+7. Request another manual workflow run.
+8. Review the source after the workflow removes its conflict report.
+9. Mark the draft ready for review.
+10. Approve the PR workflows after review of all executable changes.
+
+The publisher executes only the trusted script from main.
+It does not execute candidate scripts, dependency hooks, or local candidate actions with write credentials.
+The publisher reports actual PR checks without a claim that it ran those checks itself.
+The report distinguishes `NOT RUN`, `UNKNOWN`, `STALE`, queued, and failed checks.
+Each check snapshot names the candidate commit and its observation time.
+The live PR checks remain the current source between scheduled report updates.
+The workflow artifact retains the complete report when the PR body cannot contain it.
+
+GitHub requires human approval for PR runs from `GITHUB_TOKEN` opened, synchronize, and reopened events.
+A token-generated push does not start ordinary push workflows.
+No personal token or automatic dispatch bypass follows from that limit.
+See [GitHub's token event rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow).
+The existing required checks still control the merge.
+The Motoko review set is conservative; it does not prove that every other path is harmless.
+
+
+## Owner chat through Hermes
+
+The Chat view uses a fixed server binding. A binding links an approved rig, workspace and Hermes profile.
+The browser selects a binding ID. It cannot select a filesystem path, endpoint, credential or gateway method.
+An absent `HERDR_WEB_MOTOKO_CHAT_BINDINGS` keeps chat unconfigured. No default profile mapping exists.
+
+The private environment value contains a JSON array. Each record requires these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | A random 32-character lowercase hexadecimal binding ID. |
+| `revision` | A positive integer. Increase it when the binding changes. |
+| `rigKey`, `rigId` | The exact key and ID from the approved map catalog. |
+| `label` | A public-safe display label. |
+| `profile`, `bank` | The canonical profile name and its private Mnemosyne bank. Both values must match. |
+| `home`, `workspace`, `runtime` | Existing absolute canonical paths. Path aliases are refused. |
+| `python` | The approved Python executable. A virtual environment can use its own executable symlink. |
+| `endpoint` | An explicit HTTP loopback endpoint with a port. |
+| `revisionSha` | The accepted runtime source revision, as 40 lowercase hexadecimal characters. |
+
+The server rejects unknown fields, duplicate mappings and rigs outside the approved map catalog.
+It reads the current rig through the existing map reader before chat access. Stale evidence refuses access.
+A changed binding cannot resume a journal record from the earlier binding.
+
+The bridge uses the installed Python gateway client. It discovers an existing ready endpoint and never starts a Hermes gateway.
+Its environment excludes inherited provider credentials, proxy values and remote gateway overrides.
+It keeps `HOME`, `HERMES_HOME`, the profile name and the approved runtime import path explicit.
+The owner runtime retains its normal credential sources. Profiles do not provide operating system isolation.
+Complete credential and host isolation require separate work.
+
+The runtime must implement `motoko-required-memory-v1`, its status handler and enforcement before inference.
+The current unmodified runtime is incompatible. A capability name alone does not prove enforcement.
+Session creation persists an immutable memory requirement. The first prompt can enter with that verified requirement.
+The runtime checks the actual initialized Mnemosyne provider before inference. A failure ends the prompt before inference.
+The status remains uninitialized until the runtime observes the actual provider. Every later turn repeats the check.
+The runtime and provider patches require separate source acceptance and deployment. This web source installs neither patch.
+
+The private `chat/identities.sqlite` journal retains conversation, creation, submission and admission identities.
+It retains unresolved input text with its digest. A terminal canonical receipt removes that text from the active record.
+Hermes retains the transcript. The journal does not store transcript history.
+The journal directory uses mode 0700. Its database and exclusive writer marker use mode 0600.
+A stale writer marker refuses access after an unclean shutdown. Trusted recovery must verify the original journal before it removes the marker.
+The server never removes a stale marker automatically.
+
+One browser writer controls each conversation. A second view can inspect the conversation but cannot control it.
+The owner can confirm an explicit writer recovery. The server checks the observed generation before the transfer.
+The transfer preserves unresolved input identities. The former writer loses control immediately.
+Each conversation permits one unresolved input. A transport failure retains its original submission ID and never triggers a new submission.
+A lost-turn acknowledgement uses the recorded admission and generation. Its confirmation explains that it does not resend the input.
+An unknown acknowledgement without a canonical admission remains unresolved.
+
+The view reads current state every two seconds. These reads do not extend the owner idle deadline.
+The bridge drains events during commands. It omits reasoning events and requires a new snapshot after a replay gap.
+The private transport caps a frame at 8 MiB. Oversized history refuses access rather than an unbounded retry.
+Each history page contains at most 100 rows and 256 KiB. Its cursor belongs to one binding and canonical snapshot.
+The server caps event frames at 64 KiB and its event backlog at 128 frames or 256 KiB.
+Overflow requires a new snapshot. It cannot establish a successful terminal outcome.
+Live tool activity shows at most sixteen approved tool names and their states.
+Unknown tool names use a generic label. Live tool activity omits raw tool arguments, results and diagnostics.
+
+Owner revocation blocks later browser reads and effects. The server retains a cancellation obligation for unresolved admissions.
+It attempts Stop for the recorded admission, then detaches its viewer. An unresolved remote outcome stays explicit.
+Viewer detach does not prove remote termination across a crash. This component provides no hard remote stop guarantee.
+No real profile, endpoint or credential belongs in public documentation, browser errors or logs.
+
+
+### Hermes rig context at admission
+
+Motoko reads a fresh, typed `RigMapModel` for the selected Chat binding before each new submission.
+The existing owner scope, approved catalog, rig key, and rig ID constrain this read.
+An absent owner-profile mapping stays unknown. A profile label does not establish a mapping.
+
+The private bridge sends the safe model through canonical `api_text` with the original submission ID.
+The separate `text` field preserves the original user message in history.
+The model includes source times, separate graph and configuration reads, omitted fields, and unknown facts.
+The snapshot supplies data only. It grants no configuration edit authority.
+
+Snapshot JSON escapes literal `@` values before Hermes expands file references.
+The original user text keeps its existing reference behavior.
+A failed model read or encoded overflow refuses the send before journal insertion.
+A duplicate submission or unknown outcome does not cause another submit.
+Private submit frames have a 1,048,576-byte limit. Other private commands retain their 32,768-byte limit.
+The public input limit remains unchanged.
+
+The snapshot is fresh at admission preparation. Queue delay can make it older before inference.
+The normal GUI route must preserve `api_text`; an unsupported managed GUI policy must refuse before execution.
+This contract does not cover bypass or other managed-worker routes.
+Actual acceptance requires a separately approved test with the selected owner profile and real source data.
+Source tests do not establish runtime installation, complete fleet coverage, host isolation, or hard remote termination.

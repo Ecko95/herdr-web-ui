@@ -135,6 +135,9 @@ describe("demo transport", () => {
     "/api/pane/image": "pasting an image: the demo stores no files (listed when this guard was added)",
     "/api/pane/read": "the scrollback read behind a chat with no transcript: the demo answers /api/pane/conversation instead (listed when this guard was added)",
     "/api/pane/selection": "copying a selection across screens: not part of the demo (listed when this guard was added)",
+    "/api/motoko/chat": "owner mode only: ownerMode rejects demo auth, so Motoko never mounts MotokoChat (src/components/Motoko.tsx)",
+    "/api/motoko/health": "owner mode only: ownerMode rejects the demo auth, so Motoko never mounts HealthView (src/components/Motoko.tsx)",
+    "/api/motoko/map/rigs": "owner mode only: ownerMode rejects the demo auth, so Motoko never mounts MotokoMap (src/components/Motoko.tsx)",
     "/api/motoko/requests": "owner mode only: Motoko's Requests view runs only behind the owner gate (src/components/Motoko.tsx), which the demo never reports",
     "/api/owner/bootstrap/options": "owner mode only: the browser calls it only behind the owner gate (src/lib/motoko.ts), which the demo never reports",
     "/api/owner/credentials/add/authorize": "owner mode only: the browser calls it only behind the owner gate (src/lib/motoko.ts), which the demo never reports",
@@ -147,6 +150,7 @@ describe("demo transport", () => {
     "/api/owner/sign-out": "owner mode only: the browser calls it only behind the owner gate (src/lib/motoko.ts), which the demo never reports",
     "/api/motoko/status": "owner mode only: Motoko reads it only when /api/health reports the owner gate (src/lib/motoko.ts ownerMode), which the demo never does",
     "/api/preferences": "a 404 turns shared-settings sync off, as on an older server (fetchPreferences, src/lib/api.ts)",
+    "/api/rigs/import/validate": "server to server: createRigModelReader sends draft validation to OpenRig on loopback (server/motoko-topology.ts), never to the browser demo",
     "/api/updates/check": "the demo's /api/updates says managed: false, so Settings offers no check",
     "/api/updates/install": "the demo's /api/updates says managed: false, so Settings offers no install",
   };

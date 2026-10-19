@@ -84,3 +84,7 @@ describe("Motoko requests", () => {
     expect(ownerErrorMessage(new ApiError("/api/motoko/requests", 400, "x", "invalid_request"))).toContain("4096");
   });
 });
+
+it("explains the active login limit without a retry or eviction", () => {
+  expect(ownerErrorMessage(new ApiError("/api/owner/sign-in",409,"owner_session_limit","owner_session_limit"))).toBe("Three active logins already exist. Revoke an old login from a device that is signed in.");
+});

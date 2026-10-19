@@ -2087,3 +2087,93 @@ The values are the ones in `src/styles.css`.
 | Terminal content accessibility relies on xterm defaults | `PaneTerminal.tsx` | Screen-reader mode changes terminal DOM and input behavior | Decide with herdr TUI owners |
 | Drawer has no focus trap | `.sidebar.is-open` | Closed state leaves the tab order, but open-state trapping is not implemented | Add a shared focus utility |
 | Modal focus is initialized, not fully trapped | Dialog components | Escape/scrim/close work; tab containment is not shared | Add the same focus utility |
+
+
+## Motoko workspace navigation
+
+Motoko uses the existing sidebar style and command palette. The entry sits above all PC groups.
+The entry follows T3 Code's shared sidebar and palette access to an application page.
+[T3 Code usage guide](https://github.com/pingdotgg/t3code/blob/main/docs/user/usage.md) documents that pattern.
+The owner chooses this placement. No third-party code or pixels form this implementation.
+
+The shared action exists only for an authenticated owner. Active logins opens the existing sessions list.
+Add a passkey focuses the existing form. A navigation action never starts a passkey ceremony.
+The terminal slots stay mounted and inert under Motoko. PC and pane selection close Motoko.
+The address keeps page=motoko. Back and Forward restore the page before any pane lookup.
+Health, the login cap, rig maps, and Hermes chat remain separate components.
+
+
+## Motoko VPS health and active logins
+
+VPS health opens through the existing Motoko tabs and owner-only command palette.
+The view follows the existing T3 Code sidebar and palette pattern above. It uses the existing facts layout and theme tokens.
+The view keeps the terminal slots intact. It adds no chart, process list, or separate navigation system.
+CPU, VPS, memory, uptime, and health search terms open the actual health view. All supported languages include these entries.
+
+The server samples aggregate OS counters only after an authenticated health request.
+CPU use comes from counter deltas over the actual monotonic interval. The first sample stays Unknown.
+Invalid counters, CPU count changes, or gaps above 30 seconds restart the CPU baseline.
+Memory use includes caches. Uptime describes the server that hosts this app. Each metric can fail independently.
+The view refreshes every five seconds while visible. Closure clears refresh work and aborts the request.
+The view rejects late responses after closure. A sample older than 15 seconds shows a stale notice.
+
+OwnerStore.issue checks the three-login limit before its synchronous state save.
+Only unexpired sessions for active credentials count. A fourth login returns owner_session_limit without a cookie or state change.
+The owner can still add a passkey at capacity. The owner must explicitly revoke an old login before another login succeeds.
+The Access view retains the current-login marker, device labels, and revocation confirmation.
+Existing session and device revocation checks still guard the final terminal effects.
+
+
+### Rig map
+
+The owner-only Map tab uses the existing Motoko surfaces, type, focus styles, and theme tokens.
+Native seat buttons sit above a directed SVG link layer. The text list preserves every reported link.
+The phone view uses the same seat buttons as a list below 640 pixels.
+Saved rig, zoom, mode, and pod choices stay on the device. They change presentation only.
+The server reads only the configured rig catalog through fixed loopback routes.
+The map labels retrieval time, stale context, declared export values, and unknown effective runtime configuration separately.
+Draft controls validate typed changes. They do not apply a change or restart an agent.
+Profile edits, relationship edits and the real Hermes adapter remain separate obligations.
+
+## Save a model for the next managed resume
+
+Claude Code separates a saved default from a model choice for one session.
+See its [model configuration](https://code.claude.com/docs/en/model-config).
+Motoko uses an explicit Save control for the next managed resume.
+The current native model stays Unknown because the map has no authoritative native proof.
+The declared export, saved next-resume model and current native model remain separate values.
+The form uses the existing map classes and theme tokens.
+
+The form shows the exact rig, seat, saved model, target model and reason before Save.
+Draft validation never performs Save. Profile and relationship controls remain validation only.
+The server fixes the direct local endpoint, route and nonsecret operator value.
+The browser supplies no endpoint, session address, operator or command.
+The server requires the exact owner Origin and current owner authority after each wait.
+It resolves the allowed rig and the canonical seat again before the write.
+An unchanged target returns a no-op without a write.
+
+OpenRig stores the model and audit event in one transaction.
+Its response seat descriptor precedes the write, so Motoko performs fresh readback.
+A changed prior value or a conflicting readback reports a conflict.
+The precheck does not exclude another writer atomically.
+A timeout, ambiguous response or failed readback stays Unknown without automatic retry.
+A view change or aborted HTTP request does not prove that the remote write stopped.
+A late reply cannot update another selected rig or seat.
+The owner must refresh the map and select the seat again before another Save.
+The server cancels an incomplete Save body after five seconds or owner revocation.
+A completed explicit Refresh and same-seat selection restore the form after a result.
+Periodic refresh preserves user input, a pending Save and an Unknown result.
+This control does not restart the current native session.
+
+
+## Motoko Hermes chat
+
+The interaction follows T3 Code's explicit composer and thread Stop controls.
+The comparison uses its [composer documentation](https://github.com/pingdotgg/t3code/blob/main/docs/user/keybindings.md#composer-controls).
+Its [thread Stop command](https://github.com/pingdotgg/t3code/blob/main/docs/user/keybindings.md#commands-with-special-behavior) targets the current thread.
+Motoko targets the canonical admission and its recorded execution generation.
+This source adds no queue or steer option. One unresolved input blocks another send in the same conversation.
+A separate confirmation explains the effect of a lost-turn acknowledgement.
+The profile and rig remain visible above the history and composer. The owner selects an approved profile before the first connection.
+The view uses existing Motoko buttons, tokens and the confirmation dialog. Native controls keep keyboard and screen reader access.
+The implementation copies no T3 Code source or visual assets.

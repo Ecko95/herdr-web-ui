@@ -1755,7 +1755,7 @@ describe("typing without terminal attach, at the edges", () => {
           expect(response).toMatchObject({
             ok: false, code: transition.startsWith("observe") ? "read_only" : "not_attached",
           }); // regression (fails on main)
-          expect(keys).toHaveBeenLastCalledWith(pane, Array(secret.length).fill("Backspace"));
+          expect(keys).toHaveBeenLastCalledWith(pane, Array(secret.length).fill("Backspace"), undefined, expect.any(Function));
           await originalSend(pane, "X");
           await originalKeys(pane, ["Enter"]);
           expect(await completed).toBe("58"); // only X; no residual secret bytes
