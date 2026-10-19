@@ -1544,7 +1544,7 @@ export const ZH: Record<string, string> = {
   "No configured rig matches these filters.": "没有已配置的 rig 符合这些筛选条件。",
   "No relationship links reported in this sample.": "此样本未报告任何关系链接。",
   "No supported in-place operation is selected for this change.": "此更改未选择受支持的原位操作。",
-  "Operational controls and the real Hermes connection require a separate accepted task.": "实际操作控件和 Hermes 连接需要单独批准的任务。",
+  "Profile edits, relationship edits and the real Hermes connection require a separate accepted task.": "配置档编辑、关系编辑和真正的 Hermes 连接需要单独批准的任务。",
   "Owner profile": "所有者配置",
   "Pod filter": "Pod 筛选",
   "Proposed change": "拟议更改",
@@ -1578,4 +1578,19 @@ export const ZH: Record<string, string> = {
   "Validation only": "仅验证",
   "map topology relationships teams projects rigs configuration": "map topology relationships teams projects rigs configuration 关系图 拓扑 关系 团队 项目 配置",
   "Metadata labels can be false.": "元数据标签可能不真实。",
+
+  // Saved model control
+  "Save a model for the next managed resume": "保存下次受管恢复使用的模型",
+  "This save does not change the current native model.": "此保存不会更改当前原生模型。",
+  "A view change does not cancel a remote save.": "切换视图不会取消远程保存。",
+  "Target model": "目标模型",
+  "Saved for the next managed resume.": "已保存，供下次受管恢复使用。",
+  "The saved model is unchanged.": "已保存的模型未更改。",
+  "The model state conflicts with this request.": "模型状态与此请求冲突。",
+  "The server refused the save.": "服务器拒绝保存。",
+  "The save result is Unknown.": "保存结果未知。",
+  "Saved next-resume model": "已保存的下次恢复模型",
+  "Current native model": "当前原生模型",
+  "Refresh the map. Select the seat again before another save. No automatic retry occurs.": "请刷新地图。再次保存前，请重新选择席位。不会自动重试。",
+  "Reason": "原因",
 };

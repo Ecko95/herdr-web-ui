@@ -4,6 +4,7 @@ import type { Known } from "../../shared/motoko.ts";
 import { useSettings } from "../lib/settings.ts";
 import { fetchRigCatalog, fetchRigModel, validateRigDraft } from "../lib/motoko.ts";
 import { ApiError } from "../lib/api.ts";
+import { MotokoModelControl } from "./MotokoModelControl.tsx";
 import { useT } from "../lib/i18n.ts";
 import "./MotokoMap.css";
 
@@ -27,6 +28,7 @@ export function MotokoMap({onSessionEnded}:{onSessionEnded:()=>void}) {
  const [selected,setSelected]=useState<string|null>(null),[kind,setKind]=useState<RigDraftChange["kind"]>("seat-model"),[value,setValue]=useState("");
  const [target,setTarget]=useState(""),[edgeId,setEdgeId]=useState(""),[edgeKind,setEdgeKind]=useState<typeof EDGE_KINDS[number]>("delegates_to");
  const [validation,setValidation]=useState<RigDraftResult|null>(null),[validationError,setValidationError]=useState(false),[validating,setValidating]=useState(false);
+ const [refreshVersion,setRefreshVersion]=useState(0),[selectionVersion,setSelectionVersion]=useState(0);
  const refresh=useRef<()=>void>(()=>{}),validationController=useRef<AbortController|null>(null);
  const scroll=useRef<HTMLDivElement>(null);
  const detailHeading=useRef<HTMLHeadingElement>(null),buttons=useRef(new Map<string,HTMLButtonElement>());const marker=useId();
@@ -45,13 +47,13 @@ export function MotokoMap({onSessionEnded}:{onSessionEnded:()=>void}) {
   setSelected(null);setValidation(null);setValidationError(false);setValidating(false);setFailed(false);
   if(!rigKey){refresh.current=()=>{};return;}
   let closed=false,busy=false;let controller:AbortController|null=null;
-  const load=async()=>{
+  const load=async(manual=false)=>{
    if(closed||busy||document.visibilityState!=="visible")return;busy=true;controller=new AbortController();
-   try{const next=await fetchRigModel(rigKey,controller.signal);if(!closed){setSample({key:rigKey,model:next});setFailed(false);}}
+   try{const next=await fetchRigModel(rigKey,controller.signal);if(!closed){setSample({key:rigKey,model:next});setFailed(false);if(manual)setRefreshVersion(n=>n+1);}}
    catch(error){if(closed)return;if(error instanceof ApiError&&error.status===401)callback.current();else setFailed(true);}
    finally{busy=false;if(!closed)setNow(Date.now());}
   };
-  const tick=()=>{setNow(Date.now());void load();};refresh.current=tick;void load();const timer=window.setInterval(tick,15000);
+  const tick=()=>{setNow(Date.now());void load();};refresh.current=()=>{setNow(Date.now());void load(true);};void load();const timer=window.setInterval(tick,15000);
   document.addEventListener("visibilitychange",tick);
   return()=>{closed=true;controller?.abort();validationController.current?.abort();validationController.current=null;window.clearInterval(timer);document.removeEventListener("visibilitychange",tick);};
  },[rigKey]);
@@ -108,12 +110,12 @@ export function MotokoMap({onSessionEnded}:{onSessionEnded:()=>void}) {
       return <g key={e.id} className={selected===e.sourceId||selected===e.targetId?"is-selected":""}><path d={d} markerEnd={`url(#${marker})`}/><text x={(x+tx)/2} y={(y+ty)/2-offset/2}>{e.kind}</text></g>;
      })}
     </svg>
-    {layout.groups.filter(group=>shownSeats.some(s=>(s.podId??"")===group.id)).map(group=><section className="motoko-map-group" key={group.id}><h3 style={{top:group.y*prefs.zoom,left:40*prefs.zoom}}>{group.label||t("Ungrouped")}</h3>{shownSeats.filter(s=>(s.podId??"")===group.id).map(s=>{const pos=layout.positions.get(s.id)!;return <button type="button" className="motoko-card motoko-map-seat" key={s.id} data-seat={s.id} aria-pressed={selected===s.id} ref={el=>{if(el)buttons.current.set(s.id,el);else buttons.current.delete(s.id);}} style={{"--seat-x":`${pos.x*prefs.zoom}px`,"--seat-y":`${pos.y*prefs.zoom}px`,"--seat-w":"170px"} as CSSProperties} onKeyDown={e=>onSeatKey(e,s.id)} onClick={()=>{resetDraft();setSelected(s.id);setValue("");setEdgeId("");}}><strong>{s.logicalId}</strong><span>{text(s.runtime.value)} · {text(s.model.value)}</span><span>{text(s.startupStatus)}</span></button>;})}</section>)}
+    {layout.groups.filter(group=>shownSeats.some(s=>(s.podId??"")===group.id)).map(group=><section className="motoko-map-group" key={group.id}><h3 style={{top:group.y*prefs.zoom,left:40*prefs.zoom}}>{group.label||t("Ungrouped")}</h3>{shownSeats.filter(s=>(s.podId??"")===group.id).map(s=>{const pos=layout.positions.get(s.id)!;return <button type="button" className="motoko-card motoko-map-seat" key={s.id} data-seat={s.id} aria-pressed={selected===s.id} ref={el=>{if(el)buttons.current.set(s.id,el);else buttons.current.delete(s.id);}} style={{"--seat-x":`${pos.x*prefs.zoom}px`,"--seat-y":`${pos.y*prefs.zoom}px`,"--seat-w":"170px"} as CSSProperties} onKeyDown={e=>onSeatKey(e,s.id)} onClick={()=>{resetDraft();setSelectionVersion(n=>n+1);setSelected(s.id);setValue("");setEdgeId("");}}><strong>{s.logicalId}</strong><span>{text(s.runtime.value)} · {text(s.model.value)}</span><span>{text(s.startupStatus)}</span></button>;})}</section>)}
    </div></div>
    <section className="motoko-section"><h2 className="motoko-subtitle">{t("Directed relationships")}</h2>{model.graph.edges.length===0?<p>{t("No relationship links reported in this sample.")}</p>:<ul>{model.graph.edges.map(e=><li key={e.id}>{model.graph.seats.find(s=>s.id===e.sourceId)!.logicalId} → {e.kind} → {model.graph.seats.find(s=>s.id===e.targetId)!.logicalId}</li>)}</ul>}</section>
    {seat&&<section className="motoko-card" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();buttons.current.get(seat.id)?.focus();setSelected(null);}}}>
     <h2 className="motoko-subtitle" tabIndex={-1} ref={detailHeading}>{seat.logicalId}</h2>
-    <dl className="motoko-facts"><div><dt>{t("Session")}</dt><dd>{text(seat.sessionName)}</dd></div><div><dt>{t("Session status")}</dt><dd>{text(seat.sessionStatus)}</dd></div><div><dt>{t("Startup status")}</dt><dd>{text(seat.startupStatus)}</dd></div><div><dt>{t("Role")}</dt><dd>{text(seat.role.value)}</dd></div><div><dt>{t("Runtime")}</dt><dd>{text(seat.runtime.value)}</dd></div><div><dt>{t("Model")}</dt><dd>{text(seat.model.value)}</dd></div><div><dt>{t("AgentSpec profile")}</dt><dd>{text(seat.agentProfile.value)}</dd></div><div><dt>{seat.context.fresh?t("Context"):t("Stale context")}</dt><dd>{seat.context.percent.state==="known"?`${seat.context.percent.value}%`:t("Unknown")}</dd></div></dl>
+    <dl className="motoko-facts"><div><dt>{t("Session")}</dt><dd>{text(seat.sessionName)}</dd></div><div><dt>{t("Session status")}</dt><dd>{text(seat.sessionStatus)}</dd></div><div><dt>{t("Startup status")}</dt><dd>{text(seat.startupStatus)}</dd></div><div><dt>{t("Role")}</dt><dd>{text(seat.role.value)}</dd></div><div><dt>{t("Runtime")}</dt><dd>{text(seat.runtime.value)}</dd></div><div><dt>{t("Saved next-resume model")}</dt><dd>{text(seat.model.value)}</dd></div><div><dt>{t("Current native model")}</dt><dd>{t("Unknown")}</dd></div><div><dt>{t("AgentSpec profile")}</dt><dd>{text(seat.agentProfile.value)}</dd></div><div><dt>{seat.context.fresh?t("Context"):t("Stale context")}</dt><dd>{seat.context.percent.state==="known"?`${seat.context.percent.value}%`:t("Unknown")}</dd></div></dl>
     <h3>{t("Declared export")} · {model.configuration.readCompletedAt??t("Unknown")}</h3><p className="motoko-hint">{t("Export values can include fallback values. Effective runtime configuration stays Unknown.")}</p>
     <dl className="motoko-facts"><div><dt>{t("Model")}</dt><dd>{text(declared?.model)}</dd></div><div><dt>{t("AgentSpec profile")}</dt><dd>{text(declared?.agentProfile)}</dd></div><div><dt>{t("Codex config profile")}</dt><dd>{text(declared?.codexConfigProfile)}</dd></div><div><dt>{t("Restore policy")}</dt><dd>{text(declared?.restorePolicy)}</dd></div></dl>
     <ul>{model.graph.edges.filter(e=>e.sourceId===seat.id||e.targetId===seat.id).map(e=><li key={e.id}>{model.graph.seats.find(s=>s.id===e.sourceId)!.logicalId} → {e.kind} → {model.graph.seats.find(s=>s.id===e.targetId)!.logicalId}</li>)}</ul>
@@ -128,9 +130,10 @@ export function MotokoMap({onSessionEnded}:{onSessionEnded:()=>void}) {
      {validationError&&<p role="alert">{t("Draft validation failed. Refresh the map before another check.")}</p>}
      {validation&&validation.snapshotId===model.configuration.snapshotId&&<p role="status">{validation.valid?t("The draft passes structural validation. No change occurs."):t("The draft fails structural validation. No change occurs.")}</p>}
     </form>
+    <MotokoModelControl rigKey={model.rig.key} rigId={model.rig.id} rigName={model.rig.name} seatId={seat.id} logicalId={seat.logicalId} savedModel={seat.model.value.state==="known"?seat.model.value.value:null} stale={stale} refreshVersion={refreshVersion} selectionVersion={selectionVersion} onSessionEnded={()=>callback.current()}/>
    </section>}
    {model.configuration.state==="unknown"&&<p className="motoko-banner">{t("Declared configuration is Unknown. Draft validation is unavailable.")}</p>}
-   <p className="motoko-hint">{t("Operational controls and the real Hermes connection require a separate accepted task.")}</p>
+   <p className="motoko-hint">{t("Profile edits, relationship edits and the real Hermes connection require a separate accepted task.")}</p>
   </>}
  </div>;
 }

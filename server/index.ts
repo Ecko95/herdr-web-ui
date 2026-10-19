@@ -1,5 +1,6 @@
 import { mapScope, motokoMapScopeFromEnv, motokoTarget, type MotokoMapScope } from "./motoko-config.ts";
 import { createRigModelReader } from "./motoko-topology.ts";
+import { createModelControl } from "./motoko-model-control.ts";
 import { createHealthSampler } from "./motoko-health.ts";
 import { createOpenRigProvider } from "./motoko-reader.ts";
 import { OwnerError, OwnerStore, ownerConfiguration, ownerRequestAllowed, disabledOwnerRoute, ownerError, type OwnerConfig } from "./motoko-owner.ts";
@@ -348,6 +349,7 @@ export function createServer(
   const motokoEnv = { ...process.env };
   const mapCatalog = mapScope(options.motokoMapScope, motokoTarget(motokoEnv));
   const mapReader = createRigModelReader(mapCatalog);
+  const modelControl = createModelControl(mapReader);
   const mapRigKeys = new Set(mapCatalog?.rigs.map(r => r.key) ?? []);
   const motokoProvider = options.motokoProvider ?? createOpenRigProvider(undefined, Date.now, motokoEnv);
   // Owner requests to the orchestrator: enabled only by the exact registered source (HERDR_WEB_MOTOKO_SOURCE_SESSION)
@@ -1232,6 +1234,14 @@ export function createServer(
       }
 
       if (pathname.startsWith("/api/motoko/map/")) {
+        if (pathname.endsWith("/model")) {
+          const { handleModelControlRequest } = await import("./motoko-model-control.ts");
+          if (!owner || !ownerSession || !owner.current(ownerSession.id)) return owner?.denied() ?? new Response(null, { status: 404 });
+          const session = ownerSession;
+          const context = { ownerSessionId: session.id, allowedRigKeys: mapRigKeys, origin: owner.config.origin,
+            signal: AbortSignal.any([request.signal, owner.signal(session.id)]), recheck: () => { owner.assertCurrent(session.id); } };
+          return handleModelControlRequest(request, modelControl, context);
+        }
         const { handleRigMapRequest } = await import("./motoko-topology.ts");
         if (!owner || !ownerSession || !owner.current(ownerSession.id)) return owner?.denied() ?? new Response(null, { status: 404 });
         const session = ownerSession;

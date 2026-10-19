@@ -2133,4 +2133,34 @@ Saved rig, zoom, mode, and pod choices stay on the device. They change presentat
 The server reads only the configured rig catalog through fixed loopback routes.
 The map labels retrieval time, stale context, declared export values, and unknown effective runtime configuration separately.
 Draft controls validate typed changes. They do not apply a change or restart an agent.
-Operational controls and the real Hermes adapter remain separate obligations.
+Profile edits, relationship edits and the real Hermes adapter remain separate obligations.
+
+## Save a model for the next managed resume
+
+Claude Code separates a saved default from a model choice for one session.
+See its [model configuration](https://code.claude.com/docs/en/model-config).
+Motoko uses an explicit Save control for the next managed resume.
+The current native model stays Unknown because the map has no authoritative native proof.
+The declared export, saved next-resume model and current native model remain separate values.
+The form uses the existing map classes and theme tokens.
+
+The form shows the exact rig, seat, saved model, target model and reason before Save.
+Draft validation never performs Save. Profile and relationship controls remain validation only.
+The server fixes the direct local endpoint, route and nonsecret operator value.
+The browser supplies no endpoint, session address, operator or command.
+The server requires the exact owner Origin and current owner authority after each wait.
+It resolves the allowed rig and the canonical seat again before the write.
+An unchanged target returns a no-op without a write.
+
+OpenRig stores the model and audit event in one transaction.
+Its response seat descriptor precedes the write, so Motoko performs fresh readback.
+A changed prior value or a conflicting readback reports a conflict.
+The precheck does not exclude another writer atomically.
+A timeout, ambiguous response or failed readback stays Unknown without automatic retry.
+A view change or aborted HTTP request does not prove that the remote write stopped.
+A late reply cannot update another selected rig or seat.
+The owner must refresh the map and select the seat again before another Save.
+The server cancels an incomplete Save body after five seconds or owner revocation.
+A completed explicit Refresh and same-seat selection restore the form after a result.
+Periodic refresh preserves user input, a pending Save and an Unknown result.
+This control does not restart the current native session.

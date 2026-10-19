@@ -1540,7 +1540,7 @@ export const KO: Record<string, string> = {
   "No configured rig matches these filters.": "이 필터와 일치하는 설정된 리그가 없습니다.",
   "No relationship links reported in this sample.": "이 샘플에 보고된 관계 링크가 없습니다.",
   "No supported in-place operation is selected for this change.": "이 변경에는 지원되는 직접 수정 작업이 선택되지 않았습니다.",
-  "Operational controls and the real Hermes connection require a separate accepted task.": "실제 운영 제어와 Hermes 연결에는 별도로 승인된 작업이 필요합니다.",
+  "Profile edits, relationship edits and the real Hermes connection require a separate accepted task.": "프로필 편집, 관계 편집 및 실제 Hermes 연결에는 별도로 승인된 작업이 필요합니다.",
   "Owner profile": "소유자 프로필",
   "Pod filter": "포드 필터",
   "Proposed change": "제안한 변경",
@@ -1574,4 +1574,19 @@ export const KO: Record<string, string> = {
   "Validation only": "검증 전용",
   "map topology relationships teams projects rigs configuration": "map topology relationships teams projects rigs configuration 지도 토폴로지 관계 팀 프로젝트 리그 설정",
   "Metadata labels can be false.": "메타데이터 이름이 사실과 다를 수 있습니다.",
+
+  // Saved model control
+  "Save a model for the next managed resume": "다음 관리 재개에 사용할 모델 저장",
+  "This save does not change the current native model.": "이 저장은 현재 네이티브 모델을 변경하지 않습니다.",
+  "A view change does not cancel a remote save.": "화면을 변경해도 원격 저장은 취소되지 않습니다.",
+  "Target model": "대상 모델",
+  "Saved for the next managed resume.": "다음 관리 재개를 위해 저장했습니다.",
+  "The saved model is unchanged.": "저장된 모델은 변경되지 않았습니다.",
+  "The model state conflicts with this request.": "모델 상태가 이 요청과 충돌합니다.",
+  "The server refused the save.": "서버가 저장을 거부했습니다.",
+  "The save result is Unknown.": "저장 결과를 알 수 없습니다.",
+  "Saved next-resume model": "다음 재개를 위해 저장된 모델",
+  "Current native model": "현재 네이티브 모델",
+  "Refresh the map. Select the seat again before another save. No automatic retry occurs.": "맵을 새로 고치세요. 다시 저장하려면 좌석을 다시 선택하세요. 자동으로 재시도하지 않습니다.",
+  "Reason": "사유",
 };

@@ -27,6 +27,11 @@ afterEach(async()=>{await act(async()=>renderer?.unmount());renderer=undefined;f
 const view=(callback=()=>{ended++;})=><SettingsProvider><MotokoMap onSessionEnded={callback}/></SettingsProvider>;
 async function open(){await act(async()=>{renderer=create(view(),{createNodeMock:e=>({clientWidth:380,focus:()=>focused.push(String((e.props as {"data-seat"?:string;children?:unknown})["data-seat"]??(e.props as {children?:unknown}).children)),scrollIntoView(){}})});});await act(async()=>requests[0]!.reply(Response.json(catalog)));}
 async function loaded(){await open();await act(async()=>requests[1]!.reply(Response.json(model())));}
+it("labels the saved model separately from the declared and current native models",async()=>{
+ await loaded();await act(async()=>renderer!.root.findAllByType("button").find(n=>n.props["data-seat"]==="a")!.props.onClick());
+ const text=JSON.stringify(renderer!.toJSON());expect(text).toContain("Saved next-resume model");expect(text).toContain("Current native model");expect(text).toContain("Declared export");
+ expect(requests).toHaveLength(2);
+});
 it("keeps the active request across callback changes and uses the latest callback",async()=>{
  await open();const signal=requests[1]!.init?.signal;let newest=0;
  await act(async()=>renderer!.update(view(()=>{newest++;})));expect(requests).toHaveLength(2);expect(signal?.aborted).toBe(false);
@@ -54,7 +59,7 @@ it("supports keyboard seat selection and shows validation preview without Apply"
  await act(async()=>seats[0]!.props.onKeyDown({key:"End",preventDefault(){}}));expect(focused.at(-1)).toBe("b");
  await act(async()=>seats[0]!.props.onClick());
  const input=renderer!.root.findAllByType("input").find(e=>e.props.name==="draft-value")!;await act(async()=>input.props.onChange({target:{value:"new-model"}}));
- const form=renderer!.root.findByType("form");await act(async()=>form.props.onSubmit({preventDefault(){}}));
+ const form=renderer!.root.findAllByType("form")[0]!;await act(async()=>form.props.onSubmit({preventDefault(){}}));
  expect(requests.at(-1)!.url).toEndWith("/one/validate");expect(JSON.parse(String(requests.at(-1)!.init?.body))).toMatchObject({changes:[{kind:"seat-model",seatId:"a",value:"new-model"}]});
  expect(renderer!.root.findAllByType("button").some(e=>e.props.children==="Apply")).toBe(false);
 });
@@ -77,4 +82,34 @@ it("fits the map to the available width without a topology request",async()=>{
  await loaded();const before=requests.length;const fit=renderer!.root.findAllByType("button").find(b=>b.props["aria-label"]==="Fit")!;
  await act(async()=>fit.props.onClick());expect(requests).toHaveLength(before);
  const canvas=renderer!.root.findAllByType("div").find(e=>String(e.props.className).includes("motoko-map-canvas"))!;expect(canvas.props.style["--map-zoom"]).toBe(0.5);
+});
+
+it("restores the same-seat form after explicit Refresh and allows a second explicit Save",async()=>{
+ await open();const before=model();for(const seat of before.graph.seats)seat.model={...seat.model,value:known("old")};
+ await act(async()=>requests[1]!.reply(Response.json(before)));
+ const select=()=>renderer!.root.findAllByType("button").find(n=>n.props["data-seat"]==="a")!.props.onClick();
+ const input=(name:string)=>renderer!.root.findAllByType("input").find(n=>n.props.name===name)!;
+ const fill=async(target:string)=>{for(const[name,value]of [["model-target",target],["model-reason","Owner test"]] as const)await act(async()=>input(name).props.onChange({target:{value}}));};
+ const save=async()=>{await act(async()=>renderer!.root.findAllByType("form")[1]!.props.onSubmit({preventDefault(){}}));};
+ await act(async()=>select());await fill("new");await save();expect(requests).toHaveLength(3);
+ await act(async()=>requests[2]!.reply(Response.json({outcome:"saved",rigId:"one",seatId:"a",logicalId:"one.a",targetModel:"new",savedModel:"new",readback:"known",changed:true})));
+ await act(async()=>renderer!.root.findAllByType("button").find(n=>n.props["aria-label"]==="Refresh")!.props.onClick());
+ const after=model();for(const seat of after.graph.seats)seat.model={...seat.model,value:known("new")};
+ await act(async()=>requests[3]!.reply(Response.json(after)));await act(async()=>select());
+ expect(input("model-target").props.disabled).toBe(false);await fill("next");expect(requests).toHaveLength(4);await save();
+ expect(requests).toHaveLength(5);expect(JSON.parse(String(requests[4]!.init?.body))).toMatchObject({expectedModel:"new",model:"next"});
+});
+it("preserves input, a pending Save and an Unknown result through periodic map samples",async()=>{
+ await open();const sample=()=>{const next=model();for(const seat of next.graph.seats)seat.model={...seat.model,value:known("old")};return next;};
+ await act(async()=>requests[1]!.reply(Response.json(sample())));
+ await act(async()=>renderer!.root.findAllByType("button").find(n=>n.props["data-seat"]==="a")!.props.onClick());
+ const target=()=>renderer!.root.findAllByType("input").find(n=>n.props.name==="model-target")!;
+ for(const[name,value]of [["model-target","new"],["model-reason","Owner test"]])await act(async()=>renderer!.root.findAllByType("input").find(n=>n.props.name===name)!.props.onChange({target:{value}}));
+ const tick=async()=>{await act(async()=>{for(const fn of ticks.values())fn();});await act(async()=>requests.at(-1)!.reply(Response.json(sample())));};
+ await tick();expect(target().props.value).toBe("new");expect(target().props.disabled).toBe(false);
+ await act(async()=>renderer!.root.findAllByType("form")[1]!.props.onSubmit({preventDefault(){}}));const write=requests.at(-1)!;
+ await tick();expect(target().props.value).toBe("new");expect(target().props.disabled).toBe(true);
+ await act(async()=>write.reply(Response.json({outcome:"unknown",rigId:"one",seatId:"a",logicalId:"one.a",targetModel:"new",savedModel:null,readback:"unknown",changed:null})));
+ await tick();expect(JSON.stringify(renderer!.toJSON())).toContain("The save result is Unknown.");expect(target().props.disabled).toBe(true);expect(target().props.value).toBe("new");
+ expect(requests.filter(r=>r.url.endsWith("/model"))).toHaveLength(1);
 });

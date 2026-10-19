@@ -1,4 +1,5 @@
 import type { RigCatalog, RigMapModel, RigDraftRequest, RigDraftResult } from "../../shared/motoko-topology.ts";
+import type { ModelSaveInput, ModelSaveResult } from "../../shared/motoko-model-control.ts";
 /**
  * The browser's side of Motoko: the status read and the owner's passkey ceremonies against
  * /api/owner/* (server/motoko-owner.ts). The ceremonies are the browser's own WebAuthn prompts,
@@ -141,3 +142,4 @@ export function ownerErrorMessage(error: unknown): string {
 export const fetchRigCatalog = (signal?:AbortSignal):Promise<RigCatalog> => request("/api/motoko/map/rigs","GET",undefined,signal);
 export const fetchRigModel = (key:string,signal?:AbortSignal):Promise<RigMapModel> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}`,"GET",undefined,signal);
 export const validateRigDraft = (key:string,input:RigDraftRequest,signal?:AbortSignal):Promise<RigDraftResult> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}/validate`,"POST",input,signal);
+export const saveSeatModel = (key:string,input:ModelSaveInput):Promise<ModelSaveResult> => request(`/api/motoko/map/rigs/${encodeURIComponent(key)}/model`,"POST",input);

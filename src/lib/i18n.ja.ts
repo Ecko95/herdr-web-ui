@@ -1542,7 +1542,7 @@ export const JA: Record<string, string> = {
   "No configured rig matches these filters.": "この条件に一致する設定済みのリグはありません。",
   "No relationship links reported in this sample.": "この取得結果には関係リンクが報告されていません。",
   "No supported in-place operation is selected for this change.": "この変更に対応する既存構成への操作は選択されていません。",
-  "Operational controls and the real Hermes connection require a separate accepted task.": "実運用の操作と実際の Hermes 接続には、別途承認されたタスクが必要です。",
+  "Profile edits, relationship edits and the real Hermes connection require a separate accepted task.": "プロファイル編集、関係編集、実際の Hermes 接続には、別途承認されたタスクが必要です。",
   "Owner profile": "所有者プロファイル",
   "Pod filter": "ポッドの絞り込み",
   "Proposed change": "変更案",
@@ -1576,4 +1576,19 @@ export const JA: Record<string, string> = {
   "Validation only": "検証のみ",
   "map topology relationships teams projects rigs configuration": "map topology relationships teams projects rigs configuration マップ トポロジー 関係 チーム プロジェクト リグ 設定",
   "Metadata labels can be false.": "メタデータの表示名は事実と異なる場合があります。",
+
+  // Saved model control
+  "Save a model for the next managed resume": "次の管理対象の再開に使うモデルを保存",
+  "This save does not change the current native model.": "この保存は現在のネイティブモデルを変更しません。",
+  "A view change does not cancel a remote save.": "表示を変更してもリモートの保存はキャンセルされません。",
+  "Target model": "対象モデル",
+  "Saved for the next managed resume.": "次の管理対象の再開用に保存しました。",
+  "The saved model is unchanged.": "保存済みモデルに変更はありません。",
+  "The model state conflicts with this request.": "モデルの状態がこのリクエストと競合しています。",
+  "The server refused the save.": "サーバーが保存を拒否しました。",
+  "The save result is Unknown.": "保存結果は不明です。",
+  "Saved next-resume model": "次の再開用に保存したモデル",
+  "Current native model": "現在のネイティブモデル",
+  "Refresh the map. Select the seat again before another save. No automatic retry occurs.": "マップを更新してください。再度保存する前にシートを選び直してください。自動再試行はしません。",
+  "Reason": "理由",
 };
